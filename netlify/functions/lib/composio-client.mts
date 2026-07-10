@@ -80,6 +80,7 @@ interface RawGoogleCalendarEvent {
   htmlLink?: string;
   start?: { date?: string; dateTime?: string };
   end?: { date?: string; dateTime?: string };
+  extendedProperties?: { private?: Record<string, string>; shared?: Record<string, string> };
 }
 
 export interface DisponibilidadParams {
@@ -94,6 +95,7 @@ export interface EventoCalendar {
   end: string;
   summary: string;
   htmlLink?: string;
+  unidad?: string;
 }
 
 function mapearEvento(raw: RawGoogleCalendarEvent): EventoCalendar {
@@ -103,26 +105,56 @@ function mapearEvento(raw: RawGoogleCalendarEvent): EventoCalendar {
     end: raw.end?.dateTime ?? raw.end?.date ?? "",
     summary: raw.summary ?? "",
     htmlLink: raw.htmlLink,
+    unidad: raw.extendedProperties?.private?.unidad,
   };
 }
 
 // Chequea eventos existentes en el rango solicitado para decidir si la
-// unidad está disponible. La decisión de disponibilidad por unidad física
-// (qué carpa/cabaña/sitio puntual) se resuelve comparando este listado
-// contra el mapa de unidades del negocio, guardado en Google Sheets.
+// unidad está disponible. Si se pasa "unidad", filtra solo los eventos
+// etiquetados con esa unidad física puntual (ver buscarUnidadLibre).
 export async function chequearDisponibilidad(
-  params: DisponibilidadParams
+  params: DisponibilidadParams & { unidad?: string }
 ): Promise<EventoCalendar[]> {
+  const args: Record<string, unknown> = {
+    calendarId: params.calendarId,
+    timeMin: normalizarFechaISO(params.fechaInicioISO),
+    timeMax: normalizarFechaISO(params.fechaFinISO),
+    singleEvents: true,
+  };
+  if (params.unidad) {
+    args.privateExtendedProperty = `unidad=${params.unidad}`;
+  }
   const data = await executeAction<{ items?: RawGoogleCalendarEvent[] }>(
     "GOOGLECALENDAR_EVENTS_LIST",
-    {
-      calendarId: params.calendarId,
-      timeMin: normalizarFechaISO(params.fechaInicioISO),
-      timeMax: normalizarFechaISO(params.fechaFinISO),
-      singleEvents: true,
-    }
+    args
   );
   return (data.items ?? []).map(mapearEvento);
+}
+
+// Mapa de unidades físicas: recorre el inventario de unidades del negocio
+// (carpa/cabaña/sitio/habitación puntual, ver lib/negocios.mts) y devuelve
+// la primera que no tenga ningún evento superpuesto en el rango pedido.
+// Cada evento de reserva queda etiquetado con su unidad (extendedProperties
+// .private.unidad), así que alcanza con Google Calendar — no hace falta un
+// calendario por unidad ni una base de datos aparte.
+export async function buscarUnidadLibre(params: {
+  calendarId: string;
+  unidadesFisicas: string[];
+  fechaInicioISO: string;
+  fechaFinISO: string;
+}): Promise<string | null> {
+  for (const unidad of params.unidadesFisicas) {
+    const eventos = await chequearDisponibilidad({
+      calendarId: params.calendarId,
+      fechaInicioISO: params.fechaInicioISO,
+      fechaFinISO: params.fechaFinISO,
+      unidad,
+    });
+    if (eventos.length === 0) {
+      return unidad;
+    }
+  }
+  return null;
 }
 
 export interface CrearReservaParams {
@@ -132,6 +164,7 @@ export interface CrearReservaParams {
   fechaInicioISO: string;
   fechaFinISO: string;
   emailHuesped: string;
+  unidad: string;
 }
 
 export async function crearReservaEnCalendar(
@@ -148,6 +181,9 @@ export async function crearReservaEnCalendar(
       attendees: [params.emailHuesped],
       // Sin link de Google Meet: no aplica a una reserva de alojamiento.
       create_meeting_room: false,
+      // Acá queda registrada la unidad física asignada, para que las
+      // próximas búsquedas de disponibilidad la puedan filtrar.
+      extended_properties: { private: { unidad: params.unidad } },
     }
   );
   return mapearEvento(data.response_data);
