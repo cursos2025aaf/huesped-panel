@@ -2,14 +2,14 @@
 //
 // AGENTE B — Cobro.
 // Se dispara cuando el Agente de Atención confirma una reserva. Genera el
-// link de pago por el riel correspondiente (MercadoPago para huésped local,
-// Stripe para huésped internacional) según el perfil de modalidad, y lo
-// envía por email. Diseñado como Netlify Function estándar (no background)
-// porque el trabajo es corto: un llamado a la pasarela de pago + un email.
+// link de pago por MercadoPago (único riel — acepta tarjetas locales e
+// internacionales) según el perfil de modalidad, y lo envía por email.
+// Diseñado como Netlify Function estándar (no background) porque el
+// trabajo es corto: un llamado a la pasarela de pago + un email.
 //
 // Variables de entorno requeridas:
 //   COMPOSIO_API_KEY, COMPOSIO_ENTITY_ID
-//   MERCADOPAGO_ACCESS_TOKEN y/o STRIPE_SECRET_KEY
+//   MERCADOPAGO_ACCESS_TOKEN
 //
 // Body esperado (POST):
 // {
@@ -17,9 +17,7 @@
 //   "modalidad": "cabanas",
 //   "reservaId": "abc123",
 //   "emailHuesped": "huesped@example.com",
-//   "esHuespedInternacional": false,
 //   "montoTotalARS": 120000,
-//   "montoTotalUSD": 130,
 //   "descripcionReserva": "2 noches, Cabaña Vista Lago"
 // }
 
@@ -33,9 +31,7 @@ interface SolicitudCobro {
   modalidad: string;
   reservaId: string;
   emailHuesped: string;
-  esHuespedInternacional: boolean;
-  montoTotalARS?: number;
-  montoTotalUSD?: number;
+  montoTotalARS: number;
   descripcionReserva: string;
 }
 
@@ -59,17 +55,15 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     modalidad,
     reservaId,
     emailHuesped,
-    esHuespedInternacional,
     montoTotalARS,
-    montoTotalUSD,
     descripcionReserva,
   } = solicitud;
 
-  if (!negocioId || !modalidad || !reservaId || !emailHuesped || !descripcionReserva) {
+  if (!negocioId || !modalidad || !reservaId || !emailHuesped || !montoTotalARS || !descripcionReserva) {
     return new Response(
       JSON.stringify({
         error:
-          "Faltan campos requeridos: negocioId, modalidad, reservaId, emailHuesped, descripcionReserva",
+          "Faltan campos requeridos: negocioId, modalidad, reservaId, emailHuesped, montoTotalARS, descripcionReserva",
       }),
       { status: 400, headers: { "Content-Type": "application/json" } }
     );
@@ -83,12 +77,10 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     const factorCobro =
       perfil.cobro.timing === "anticipado_total" ? 1 : perfil.cobro.porcentajeSenal / 100;
 
-    const montoARS = montoTotalARS ? Math.round(montoTotalARS * factorCobro) : undefined;
-    const montoUSD = montoTotalUSD ? Math.round(montoTotalUSD * factorCobro * 100) / 100 : undefined;
+    const montoARS = Math.round(montoTotalARS * factorCobro);
 
-    const link = await generarLinkDePago(esHuespedInternacional, {
+    const link = await generarLinkDePago({
       montoARS,
-      montoUSD,
       descripcion: `${descripcionReserva} (${perfil.cobro.timing === "anticipado_total" ? "pago total" : `seña ${perfil.cobro.porcentajeSenal}%`})`,
       referenciaReserva: reservaId,
       emailHuesped,
@@ -114,7 +106,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       JSON.stringify({
         cobroGenerado: true,
         proveedor: link.proveedor,
-        montoCobrado: link.proveedor === "stripe" ? montoUSD : montoARS,
+        montoCobrado: montoARS,
         reservaId,
       }),
       { status: 200, headers: { "Content-Type": "application/json" } }
