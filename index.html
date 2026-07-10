@@ -19,6 +19,7 @@
 
   .app{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100vh;}
 
+  /* SIDEBAR */
   .sidebar{background:linear-gradient(180deg,var(--navy) 0%,#081b30 100%);color:#fff;padding:28px 20px;display:flex;flex-direction:column;gap:36px;position:sticky;top:0;height:100vh;}
   .brand{display:flex;flex-direction:column;gap:2px;}
   .brand-mark{display:flex;align-items:center;gap:8px;}
@@ -37,6 +38,7 @@
   .sidebar-foot{margin-top:auto;padding-top:20px;border-top:1px solid rgba(255,255,255,.1);font-size:11.5px;color:var(--gris-lt);line-height:1.6;}
   .sidebar-foot strong{color:#fff;}
 
+  /* MAIN */
   .main{padding:28px 28px 60px;max-width:1160px;min-width:0;}
   .topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;flex-wrap:wrap;gap:16px;}
   .topbar h1{font-size:25px;font-weight:800;letter-spacing:-.01em;}
@@ -194,7 +196,7 @@
           </div>
           <div class="flow-item b">
             <div class="flow-dot">B</div>
-            <div class="flow-txt"><strong>Agente de Cobro</strong><span id="flow-cobro">Genera el link de seña (30%) por MercadoPago o Stripe y lo envía por email.</span></div>
+            <div class="flow-txt"><strong>Agente de Cobro</strong><span id="flow-cobro">Genera el link de seña (30%) por MercadoPago (acepta tarjetas locales e internacionales) y lo envía por email.</span></div>
           </div>
         </div>
       </div>
@@ -280,7 +282,7 @@ const DATA = {
     ],
     occ: [{l:"Standard",p:85},{l:"Doble",p:74},{l:"Triple",p:60},{l:"Suite",p:90}],
     upsellTxt: "Sugiere media pensión, traslados o excursiones según origen y duración.",
-    cobroTxt: "Pago anticipado completo o seña alta vía Stripe (huésped internacional) o MercadoPago (local).",
+    cobroTxt: "Pago anticipado completo o seña alta por MercadoPago, incluso para huéspedes internacionales.",
   }
 };
 
