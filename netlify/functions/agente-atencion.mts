@@ -76,8 +76,25 @@ async function interpretarConsulta(
   }
 
   const json = (await res.json()) as { content: { text: string }[] };
-  const textoRespuesta = json.content?.[0]?.text ?? "{}";
-  return JSON.parse(textoRespuesta) as InterpretacionClaude;
+  let textoRespuesta = (json.content?.[0]?.text ?? "{}").trim();
+
+  // Claude a veces envuelve el JSON en un bloque de código (```json ... ```)
+  // aunque el prompt pida "sin texto adicional". Lo sacamos de forma
+  // robusta en vez de asumir que la respuesta siempre viene "limpia".
+  if (textoRespuesta.startsWith("```")) {
+    textoRespuesta = textoRespuesta
+      .replace(/^```[a-zA-Z]*\n?/, "")
+      .replace(/```\s*$/, "")
+      .trim();
+  }
+
+  try {
+    return JSON.parse(textoRespuesta) as InterpretacionClaude;
+  } catch {
+    throw new Error(
+      `No se pudo interpretar la respuesta de Claude como JSON: ${textoRespuesta.slice(0, 300)}`
+    );
+  }
 }
 
 export default async (req: Request, _context: Context): Promise<Response> => {
