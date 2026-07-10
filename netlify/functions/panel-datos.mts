@@ -73,6 +73,10 @@ function solapa(aInicio: Date, aFin: Date, bInicio: Date, bFin: Date): boolean {
   return aInicio < bFin && bInicio < aFin;
 }
 
+function capitalizar(txt: string): string {
+  return txt.charAt(0).toUpperCase() + txt.slice(1);
+}
+
 export default async (req: Request, _context: Context): Promise<Response> => {
   if (req.method !== "GET") {
     return new Response("Método no permitido", { status: 405 });
@@ -143,7 +147,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       {
         ic: "🏡",
         bg: "#F0F9FF",
-        label: `${perfil.nombreUnidadPlural} ocupadas hoy`,
+        label: `${capitalizar(perfil.nombreUnidadPlural)} ocupadas hoy`,
         val: `${unidadesOcupadasHoy} / ${negocio.unidadesFisicas.length}`,
         trend: `${Math.round((unidadesOcupadasHoy / negocio.unidadesFisicas.length) * 100)}%`,
         trendType: "up",
@@ -208,8 +212,8 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       JSON.stringify({
         fuente: "real",
         negocio: negocio.nombre,
-        unidad: perfil.nombreUnidad,
-        unidadPl: perfil.nombreUnidadPlural,
+        unidad: capitalizar(perfil.nombreUnidad),
+        unidadPl: capitalizar(perfil.nombreUnidadPlural),
         stats,
         reservas,
         occ,
