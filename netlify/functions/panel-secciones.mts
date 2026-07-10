@@ -1,7 +1,7 @@
 // netlify/functions/panel-secciones.mts
 //
-// Endpoint único que alimenta las 4 pestañas nuevas del panel (Reservas,
-// Disponibilidad, Cobros/base y Upsell, más Configuración) con datos reales
+// Endpoint único que alimenta las 5 pestañas nuevas del panel (Reservas,
+// Disponibilidad, Cobros, Upsell y Configuración) con datos reales
 // leídos de Google Calendar y de la config del negocio — nada inventado.
 // Se consolida en una sola función para no repetir la misma consulta al
 // Calendar cuatro veces.
@@ -109,8 +109,42 @@ export default async (req: Request, _context: Context): Promise<Response> => {
           personas: personas ? Number(personas) : null,
           upsell,
           esFutura: new Date(e.end) >= hoy,
+          // Estado de cobro real (ver webhook-mercadopago.mts): ausente si
+          // todavía no se generó/confirmó ningún pago para esta reserva.
+          pagoEstado: e.pagoEstado ?? null,
+          pagoMontoARS: e.pagoMontoARS ?? null,
+          pagoFecha: e.pagoFecha ?? null,
         };
       });
+
+    // Cobros: resumen real de lo efectivamente cobrado/pendiente, a partir
+    // de las mismas etiquetas de pago de "reservas" — nada de estimaciones.
+    // Si una reserva no tiene pagoEstado, cuenta como "sin registrar"
+    // (todavía no pasó por el webhook de MercadoPago).
+    let montoAprobadoARS = 0;
+    let montoPendienteARS = 0;
+    let cantidadAprobadas = 0;
+    let cantidadPendientes = 0;
+    let cantidadSinRegistrar = 0;
+    for (const r of reservas) {
+      if (r.pagoEstado === "approved") {
+        montoAprobadoARS += r.pagoMontoARS ?? 0;
+        cantidadAprobadas++;
+      } else if (r.pagoEstado) {
+        montoPendienteARS += r.pagoMontoARS ?? 0;
+        cantidadPendientes++;
+      } else {
+        cantidadSinRegistrar++;
+      }
+    }
+    const cobrosResumen = {
+      montoAprobadoARS,
+      montoPendienteARS,
+      cantidadAprobadas,
+      cantidadPendientes,
+      cantidadSinRegistrar,
+      totalReservas: reservas.length,
+    };
 
     const diasGrillaArr = Array.from({ length: diasGrilla }, (_, i) => fechaISOCorta(sumarDias(hoy, i)));
     const disponibilidad = {
@@ -144,7 +178,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     };
 
     return new Response(
-      JSON.stringify({ configuracion, reservas, disponibilidad, upsellResumen }),
+      JSON.stringify({ configuracion, reservas, disponibilidad, upsellResumen, cobrosResumen }),
       { status: 200, headers: { "Content-Type": "application/json" } }
     );
   } catch (err) {
