@@ -39,6 +39,13 @@ async function executeAction<T = unknown>(
       // (entity_id queda deprecado pero todavía se acepta).
       entity_id: entityId,
       user_id: entityId,
+      // CRÍTICO: sin esto, la API ejecuta una versión vieja fija del tool
+      // ("00000000_00") que ignora silenciosamente parámetros como
+      // end_datetime y extended_properties (detectado y confirmado en
+      // pruebas reales: sin "version", GOOGLECALENDAR_CREATE_EVENT creaba
+      // eventos de 30 minutos en vez de respetar la fecha de fin pedida,
+      // y nunca guardaba la unidad física asignada).
+      version: "latest",
       arguments: args,
     }),
   });
