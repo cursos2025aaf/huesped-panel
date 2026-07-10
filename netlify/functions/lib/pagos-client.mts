@@ -70,3 +70,32 @@ export async function generarLinkDePago(
 ): Promise<LinkPagoResultado> {
   return crearLinkMercadoPago(params);
 }
+
+export interface PagoMercadoPago {
+  id: string;
+  status: string; // "approved" | "pending" | "rejected" | "in_process" | "cancelled" | "refunded"
+  status_detail: string;
+  transaction_amount: number;
+  external_reference: string | null; // el reservaId (id del evento de Calendar) que se pasó al crear el link
+  date_approved: string | null;
+  date_created: string;
+}
+
+// Consulta el estado REAL de un pago contra la API de MercadoPago (nunca se
+// confía en el contenido del webhook por sí solo: el webhook solo avisa
+// "pasó algo con el pago X", y este llamado trae el estado verdadero con
+// el access token real de la cuenta). Usado por webhook-mercadopago.mts.
+export async function consultarPago(paymentId: string): Promise<PagoMercadoPago> {
+  const accessToken = Netlify.env.get("MERCADOPAGO_ACCESS_TOKEN");
+  if (!accessToken) {
+    throw new Error("Falta configurar MERCADOPAGO_ACCESS_TOKEN en Netlify.");
+  }
+  const res = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`MercadoPago (consulta de pago) respondió ${res.status}: ${text}`);
+  }
+  return (await res.json()) as PagoMercadoPago;
+}
