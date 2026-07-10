@@ -129,12 +129,12 @@
     </div>
 
     <nav class="nav" id="nav-list">
-      <div class="nav-item active" data-disponible="true"><span class="ic">◇</span> Resumen</div>
-      <div class="nav-item nav-pronto" data-disponible="false"><span class="ic">▤</span> Reservas <span class="tag-pronto">pronto</span></div>
-      <div class="nav-item nav-pronto" data-disponible="false"><span class="ic">◎</span> Disponibilidad <span class="tag-pronto">pronto</span></div>
+      <div class="nav-item active" data-disponible="true" data-section="resumen"><span class="ic">◇</span> Resumen</div>
+      <div class="nav-item" data-disponible="true" data-section="reservas"><span class="ic">▤</span> Reservas</div>
+      <div class="nav-item" data-disponible="true" data-section="disponibilidad"><span class="ic">◎</span> Disponibilidad</div>
       <div class="nav-item nav-pronto" data-disponible="false"><span class="ic">$</span> Cobros <span class="tag-pronto">pronto</span></div>
-      <div class="nav-item nav-pronto" data-disponible="false"><span class="ic">↗</span> Upsell <span class="tag-pronto">pronto</span></div>
-      <div class="nav-item nav-pronto" data-disponible="false"><span class="ic">⚙</span> Configuración <span class="tag-pronto">pronto</span></div>
+      <div class="nav-item" data-disponible="true" data-section="upsell"><span class="ic">↗</span> Upsell</div>
+      <div class="nav-item" data-disponible="true" data-section="configuracion"><span class="ic">⚙</span> Configuración</div>
     </nav>
     <div id="toast-pronto" class="toast-pronto">Esta sección todavía no está construida. Por ahora el panel muestra "Resumen".</div>
 
@@ -158,7 +158,7 @@
       </div>
     </div>
 
-    <div class="stat-grid" id="stat-grid"></div>
+    <div id="section-resumen"><div class="stat-grid" id="stat-grid"></div>
 
     <div class="grid-2">
       <div class="panel">
@@ -211,6 +211,55 @@
             <div class="flow-txt"><strong>Agente de Cobro</strong><span id="flow-cobro">Genera el link de seña (30%) por MercadoPago (acepta tarjetas locales e internacionales) y lo envía por email.</span></div>
           </div>
         </div>
+      </div>
+    </div>
+
+    </div>
+
+    <div id="section-reservas" style="display:none">
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Todas las reservas</h3>
+          <span class="muted" id="reservas-muted">datos reales de Calendar</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Huésped</th><th id="th-unidad-reservas">Unidad</th><th>Fechas</th><th>Personas</th><th>Upsell</th><th>Estado</th></tr></thead>
+            <tbody id="reservas-todas-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="section-disponibilidad" style="display:none">
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Disponibilidad — próximos 14 días</h3>
+          <span class="muted">verde = libre, celeste = ocupado</span>
+        </div>
+        <div class="table-wrap">
+          <table id="tabla-disponibilidad"><thead></thead><tbody></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <div id="section-upsell" style="display:none">
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Upsell sugerido por Agente A</h3>
+          <span class="muted" id="upsell-muted">conteo real sobre reservas registradas</span>
+        </div>
+        <div id="upsell-lista"></div>
+      </div>
+    </div>
+
+    <div id="section-configuracion" style="display:none">
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Configuración del negocio</h3>
+          <span class="muted">solo lectura por ahora</span>
+        </div>
+        <div id="configuracion-detalle"></div>
       </div>
     </div>
 
@@ -401,13 +450,122 @@ document.getElementById('mode-switch').addEventListener('click', e=>{
   render(btn.dataset.mode);
 });
 
+let SECCIONES = null;
+
+function mostrarSeccion(nombre){
+  ['resumen','reservas','disponibilidad','upsell','configuracion'].forEach(s=>{
+    const el = document.getElementById('section-'+s);
+    if(el) el.style.display = (s===nombre) ? 'block' : 'none';
+  });
+}
+
+function renderReservas(){
+  if(!SECCIONES) return;
+  const d = DATA.cabanas;
+  document.getElementById('th-unidad-reservas').textContent = d.unidad || 'Unidad';
+  const badgeMap = {ok:['badge-ok','Confirmada']};
+  const body = document.getElementById('reservas-todas-body');
+  const filas = SECCIONES.reservas;
+  if(filas.length === 0){
+    body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gris-lt);padding:20px;">Todavía no hay reservas reales cargadas.</td></tr>';
+    return;
+  }
+  body.innerHTML = filas.map(r=>{
+    const f = new Date(r.desde).toLocaleDateString('es-AR',{day:'numeric',month:'short',timeZone:'UTC'}) + ' – ' + new Date(r.hasta).toLocaleDateString('es-AR',{day:'numeric',month:'short',timeZone:'UTC'});
+    const estadoTxt = r.esFutura ? 'Confirmada' : 'Pasada';
+    const estadoCls = r.esFutura ? 'badge-ok' : 'badge-pend';
+    return `<tr>
+      <td><div class="guest"><div class="avatar">${r.iniciales}</div><div><div class="guest-name">${r.huesped}</div><div class="guest-sub">Huésped</div></div></div></td>
+      <td>${r.unidad}</td>
+      <td>${f}</td>
+      <td>${r.personas ?? '—'}</td>
+      <td>${r.upsell ? `<span class="upsell-tag">${r.upsell}</span>` : '<span style="color:#B8C0CC">—</span>'}</td>
+      <td><span class="badge ${estadoCls}">${estadoTxt}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderDisponibilidad(){
+  if(!SECCIONES) return;
+  const { dias, unidades } = SECCIONES.disponibilidad;
+  const thead = document.querySelector('#tabla-disponibilidad thead');
+  const tbody = document.querySelector('#tabla-disponibilidad tbody');
+  const diaCorto = iso => new Date(iso+'T00:00:00Z').toLocaleDateString('es-AR',{day:'numeric',month:'short',timeZone:'UTC'});
+  thead.innerHTML = '<tr><th>Unidad</th>' + dias.map(d=>`<th style="text-align:center">${diaCorto(d)}</th>`).join('') + '</tr>';
+  tbody.innerHTML = unidades.map(u=>{
+    const celdas = u.ocupados.map(ocupado=>
+      `<td style="text-align:center;padding:6px;"><span style="display:inline-block;width:16px;height:16px;border-radius:5px;background:${ocupado?'#0EA5E9':'#ECFDF5'};border:1px solid ${ocupado?'#0284C7':'#A7F3D0'};"></span></td>`
+    ).join('');
+    return `<tr><td style="font-weight:600;">${u.nombre}</td>${celdas}</tr>`;
+  }).join('');
+}
+
+function renderUpsell(){
+  if(!SECCIONES) return;
+  const { catalogo, conteos, totalConUpsell, totalReservas } = SECCIONES.upsellResumen;
+  const cont = document.getElementById('upsell-lista');
+  document.getElementById('upsell-muted').textContent = totalReservas > 0
+    ? `${totalConUpsell} de ${totalReservas} reservas incluyeron un upsell sugerido`
+    : 'todavía no hay reservas para contar';
+  const max = Math.max(1, ...catalogo.map(t => conteos[t] || 0));
+  cont.innerHTML = catalogo.map(tipo=>{
+    const n = conteos[tipo] || 0;
+    const pct = Math.round((n/max)*100);
+    return `<div class="occ-row">
+      <div class="occ-label" style="min-width:140px;">${tipo}</div>
+      <div class="occ-bar-bg"><div class="occ-bar-fill" style="width:${pct}%"></div></div>
+      <div class="occ-pct">${n}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderConfiguracion(){
+  if(!SECCIONES) return;
+  const c = SECCIONES.configuracion;
+  const cobroTxt = c.cobro.timing === 'anticipado_total'
+    ? '100% por adelantado'
+    : `Seña ${c.cobro.porcentajeSenal}% + saldo`;
+  const cont = document.getElementById('configuracion-detalle');
+  cont.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;">
+      <div><div class="occ-label">Negocio</div><div style="font-weight:700;font-size:15px;margin-top:4px;">${c.nombre}</div></div>
+      <div><div class="occ-label">Modalidad</div><div style="font-weight:700;font-size:15px;margin-top:4px;text-transform:capitalize;">${c.modalidad}</div></div>
+      <div><div class="occ-label">Unidad de reserva</div><div style="font-weight:700;font-size:15px;margin-top:4px;text-transform:capitalize;">${c.unidadNombre} (${c.cantidadUnidades} en total)</div></div>
+      <div><div class="occ-label">Granularidad</div><div style="font-weight:700;font-size:15px;margin-top:4px;text-transform:capitalize;">por ${c.granularidad} · mínimo ${c.minimoReserva}</div></div>
+      <div><div class="occ-label">Política de cobro</div><div style="font-weight:700;font-size:15px;margin-top:4px;">${cobroTxt} ${c.cobro.esPersonalizadoPorNegocio?'(personalizada)':'(default de la modalidad)'}</div></div>
+      <div><div class="occ-label">Medio de pago</div><div style="font-weight:700;font-size:15px;margin-top:4px;text-transform:capitalize;">${c.cobro.medios.join(', ')}</div></div>
+      <div><div class="occ-label">Canal preferido</div><div style="font-weight:700;font-size:15px;margin-top:4px;text-transform:capitalize;">${c.canalPreferido.join(', ')}</div></div>
+      <div><div class="occ-label">Catálogo de upsell</div><div style="font-weight:700;font-size:15px;margin-top:4px;">${c.catalogoUpsell.join(', ')}</div></div>
+    </div>
+    <p style="margin-top:16px;font-size:11.5px;color:var(--gris-lt);">Esta pantalla es de solo lectura por ahora. Para cambiar la política de cobro u otro dato, pedíselo a IAGENTES.TECH.</p>
+  `;
+}
+
+async function cargarSecciones(negocioId, calendarId){
+  try{
+    const r = await fetch(`/api/panel-secciones?negocioId=${encodeURIComponent(negocioId)}&calendarId=${encodeURIComponent(calendarId)}`);
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    SECCIONES = await r.json();
+    if(SECCIONES.error) throw new Error(SECCIONES.error);
+    renderReservas(); renderDisponibilidad(); renderUpsell(); renderConfiguracion();
+  }catch(err){
+    console.warn('No se pudieron cargar las secciones reales:', err);
+  }
+}
+
 document.getElementById('nav-list').addEventListener('click', e=>{
   const item = e.target.closest('.nav-item');
-  if(!item || item.dataset.disponible === 'true') return;
-  const toast = document.getElementById('toast-pronto');
-  toast.classList.add('show');
-  clearTimeout(window._toastTimer);
-  window._toastTimer = setTimeout(()=> toast.classList.remove('show'), 2800);
+  if(!item) return;
+  if(item.dataset.disponible !== 'true'){
+    const toast = document.getElementById('toast-pronto');
+    toast.classList.add('show');
+    clearTimeout(window._toastTimer);
+    window._toastTimer = setTimeout(()=> toast.classList.remove('show'), 2800);
+    return;
+  }
+  document.querySelectorAll('#nav-list .nav-item').forEach(n=>n.classList.remove('active'));
+  item.classList.add('active');
+  mostrarSeccion(item.dataset.section);
 });
 
 async function cargarDatosReales(negocioId, calendarId){
