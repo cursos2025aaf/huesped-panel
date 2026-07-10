@@ -17,7 +17,7 @@
   body{font-family:'Inter',system-ui,sans-serif;background:var(--fondo);color:var(--ink);}
   a{color:inherit;text-decoration:none;}
 
-  .app{display:grid;grid-template-columns:264px 1fr;min-height:100vh;}
+  .app{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100vh;}
 
   .sidebar{background:linear-gradient(180deg,var(--navy) 0%,#081b30 100%);color:#fff;padding:28px 20px;display:flex;flex-direction:column;gap:36px;position:sticky;top:0;height:100vh;}
   .brand{display:flex;flex-direction:column;gap:2px;}
@@ -37,7 +37,7 @@
   .sidebar-foot{margin-top:auto;padding-top:20px;border-top:1px solid rgba(255,255,255,.1);font-size:11.5px;color:var(--gris-lt);line-height:1.6;}
   .sidebar-foot strong{color:#fff;}
 
-  .main{padding:32px 40px 60px;max-width:1280px;}
+  .main{padding:28px 28px 60px;max-width:1160px;min-width:0;}
   .topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;flex-wrap:wrap;gap:16px;}
   .topbar h1{font-size:25px;font-weight:800;letter-spacing:-.01em;}
   .topbar p{font-size:13.5px;color:var(--gris);margin-top:4px;}
@@ -57,7 +57,8 @@
   .stat-num{font-size:28px;font-weight:800;letter-spacing:-.02em;line-height:1;margin-bottom:6px;}
   .stat-lbl{font-size:12.5px;color:var(--gris);font-weight:500;}
 
-  .grid-2{display:grid;grid-template-columns:1.4fr 1fr;gap:20px;margin-bottom:24px;align-items:start;}
+  .grid-2{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:20px;margin-bottom:24px;align-items:start;}
+  .table-wrap{overflow-x:auto;}
   .panel{background:var(--blanco);border:1px solid var(--borde);border-radius:16px;padding:24px 26px;box-shadow:0 1px 3px rgba(15,23,42,.05);}
   .panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;}
   .panel-head h3{font-size:15.5px;font-weight:700;}
@@ -154,10 +155,12 @@
           <h3 id="tbl-title">Próximas reservas</h3>
           <span class="link-btn">Ver todas →</span>
         </div>
+        <div class="table-wrap">
         <table>
           <thead><tr><th>Huésped</th><th id="th-unidad">Unidad</th><th>Fechas</th><th>Upsell</th><th>Estado</th></tr></thead>
           <tbody id="res-body"></tbody>
         </table>
+        </div>
       </div>
 
       <div class="panel">
@@ -204,6 +207,7 @@
 <script>
 const DATA = {
   balneario: {
+    label: "Balneario",
     negocio: "Balneario Marea Alta", unidad: "Carpa", unidadPl: "Carpas",
     stats: [
       {ic:"🏖️", bg:"#F0F9FF", label:"Carpas ocupadas hoy", val:"38 / 50", trend:"76%", trendType:"up"},
@@ -222,6 +226,7 @@ const DATA = {
     cobroTxt: "Cobra seña por transferencia/MercadoPago y el saldo en el lugar (efectivo o POS).",
   },
   camping: {
+    label: "Camping",
     negocio: "Camping Río Claro", unidad: "Sitio", unidadPl: "Sitios",
     stats: [
       {ic:"⛺", bg:"#F0FDF4", label:"Sitios ocupados", val:"31 / 40", trend:"78%", trendType:"up"},
@@ -240,6 +245,7 @@ const DATA = {
     cobroTxt: "Seña anticipada para asegurar el sitio + saldo online o al llegar.",
   },
   cabanas: {
+    label: "Cabañas",
     negocio: "Complejo Los Alerces", unidad: "Cabaña", unidadPl: "Cabañas",
     stats: [
       {ic:"🏡", bg:"#F0F9FF", label:"Cabañas ocupadas", val:"9 / 12", trend:"75%", trendType:"up"},
@@ -258,6 +264,7 @@ const DATA = {
     cobroTxt: "Seña 30-50% al confirmar + saldo antes de la llegada.",
   },
   hosteria: {
+    label: "Hostería",
     negocio: "Hostería Vista al Lago", unidad: "Habitación", unidadPl: "Habitaciones",
     stats: [
       {ic:"🏨", bg:"#F0F9FF", label:"Habitaciones ocupadas", val:"22 / 28", trend:"79%", trendType:"up"},
@@ -281,8 +288,8 @@ let chart;
 function render(mode){
   const d = DATA[mode];
   document.getElementById('page-title').textContent = `Resumen — ${d.negocio}`;
-  document.getElementById('foot-modalidad').textContent = mode[0].toUpperCase()+mode.slice(1);
-  document.getElementById('flow-modalidad').textContent = mode[0].toUpperCase()+mode.slice(1);
+  document.getElementById('foot-modalidad').textContent = d.label;
+  document.getElementById('flow-modalidad').textContent = d.label;
   document.getElementById('th-unidad').textContent = d.unidad;
   document.getElementById('flow-upsell').textContent = d.upsellTxt;
   document.getElementById('flow-cobro').textContent = d.cobroTxt;
