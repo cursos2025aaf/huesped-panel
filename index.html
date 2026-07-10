@@ -87,6 +87,8 @@
   .badge-ok{background:#ECFDF5;color:#059669;}
   .badge-pend{background:#FFFBEB;color:#D97706;}
   .badge-new{background:#EFF6FF;color:#2563EB;}
+.badge-warn{background:#FEF2F2;color:#DC2626;}
+.badge-muted{background:#F3F4F6;color:#6B7280;}
   .upsell-tag{font-size:11px;color:var(--celeste-dk);font-weight:600;background:#F0F9FF;padding:3px 8px;border-radius:6px;}
 
   .occ-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid #F1F4F8;}
@@ -132,7 +134,7 @@
       <div class="nav-item active" data-disponible="true" data-section="resumen"><span class="ic">◇</span> Resumen</div>
       <div class="nav-item" data-disponible="true" data-section="reservas"><span class="ic">▤</span> Reservas</div>
       <div class="nav-item" data-disponible="true" data-section="disponibilidad"><span class="ic">◎</span> Disponibilidad</div>
-      <div class="nav-item nav-pronto" data-disponible="false"><span class="ic">$</span> Cobros <span class="tag-pronto">pronto</span></div>
+      <div class="nav-item" data-disponible="true" data-section="cobros"><span class="ic">$</span> Cobros</div>
       <div class="nav-item" data-disponible="true" data-section="upsell"><span class="ic">↗</span> Upsell</div>
       <div class="nav-item" data-disponible="true" data-section="configuracion"><span class="ic">⚙</span> Configuración</div>
     </nav>
@@ -243,7 +245,17 @@
       </div>
     </div>
 
-    <div id="section-upsell" style="display:none">
+    <div id="section-cobros" style="display:none">
+  <div class="stat-grid" id="cobros-stat-grid" style="margin-bottom:16px;"></div>
+  <div class="panel">
+    <div class="panel-head"><h3>Cobros por reserva</h3><span class="muted">estado real, vía webhook de MercadoPago</span></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Huésped</th><th>Unidad</th><th>Fechas</th><th>Estado de pago</th><th>Monto</th></tr></thead>
+      <tbody id="cobros-todas-body"></tbody>
+    </table></div>
+  </div>
+</div>
+<div id="section-upsell" style="display:none">
       <div class="panel">
         <div class="panel-head">
           <h3>Upsell sugerido por Agente A</h3>
@@ -453,7 +465,7 @@ document.getElementById('mode-switch').addEventListener('click', e=>{
 let SECCIONES = null;
 
 function mostrarSeccion(nombre){
-  ['resumen','reservas','disponibilidad','upsell','configuracion'].forEach(s=>{
+  ['resumen','reservas','disponibilidad','cobros','upsell','configuracion'].forEach(s=>{
     const el = document.getElementById('section-'+s);
     if(el) el.style.display = (s===nombre) ? 'block' : 'none';
   });
@@ -497,6 +509,54 @@ function renderDisponibilidad(){
       `<td style="text-align:center;padding:6px;"><span style="display:inline-block;width:16px;height:16px;border-radius:5px;background:${ocupado?'#0EA5E9':'#ECFDF5'};border:1px solid ${ocupado?'#0284C7':'#A7F3D0'};"></span></td>`
     ).join('');
     return `<tr><td style="font-weight:600;">${u.nombre}</td>${celdas}</tr>`;
+  }).join('');
+}
+
+function estadoPagoLabel(estado){
+  const map = {
+    approved: ['Pagado','badge-ok'],
+    pending: ['Pendiente','badge-pend'],
+    in_process: ['En proceso','badge-pend'],
+    rejected: ['Rechazado','badge-warn'],
+    cancelled: ['Cancelado','badge-warn'],
+    refunded: ['Reembolsado','badge-warn'],
+  };
+  return map[estado] || ['Sin registrar','badge-muted'];
+}
+
+function renderCobros(){
+  if(!SECCIONES) return;
+  const r = SECCIONES.cobrosResumen;
+  const fmtARS = n => n.toLocaleString('es-AR', {style:'currency', currency:'ARS', maximumFractionDigits:0});
+  const cards = [
+    { ic:'✔', bg:'#ECFDF5', label:'Cobrado (aprobado)', val: fmtARS(r.montoAprobadoARS), trend:`${r.cantidadAprobadas} reserva(s)`, trendType:'up' },
+    { ic:'⏳', bg:'#FFFBEB', label:'Pendiente / en proceso', val: fmtARS(r.montoPendienteARS), trend:`${r.cantidadPendientes} reserva(s)`, trendType:'warn' },
+    { ic:'—', bg:'#F0F9FF', label:'Sin registrar todavía', val: String(r.cantidadSinRegistrar), trend:'sin webhook aún', trendType:'up' },
+  ];
+  document.getElementById('cobros-stat-grid').innerHTML = cards.map(c => `
+    <div class="stat-card">
+      <div class="stat-ic" style="background:${c.bg}">${c.ic}</div>
+      <div class="stat-label">${c.label}</div>
+      <div class="stat-val">${c.val}</div>
+      <div class="stat-trend ${c.trendType}">${c.trend}</div>
+    </div>`).join('');
+
+  const body = document.getElementById('cobros-todas-body');
+  const filas = SECCIONES.reservas;
+  if(filas.length === 0){
+    body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--gris-lt);padding:20px;">Todavía no hay reservas reales cargadas.</td></tr>';
+    return;
+  }
+  body.innerHTML = filas.map(r=>{
+    const f = new Date(r.desde).toLocaleDateString('es-AR',{day:'numeric',month:'short',timeZone:'UTC'}) + ' – ' + new Date(r.hasta).toLocaleDateString('es-AR',{day:'numeric',month:'short',timeZone:'UTC'});
+    const [txt, cls] = estadoPagoLabel(r.pagoEstado);
+    return `<tr>
+      <td><div class="guest"><div class="avatar">${r.iniciales}</div><div><div class="guest-name">${r.huesped}</div><div class="guest-sub">Huésped</div></div></div></td>
+      <td>${r.unidad}</td>
+      <td>${f}</td>
+      <td><span class="badge ${cls}">${txt}</span></td>
+      <td>${r.pagoMontoARS ? fmtARS(r.pagoMontoARS) : '<span style="color:#B8C0CC">—</span>'}</td>
+    </tr>`;
   }).join('');
 }
 
@@ -547,7 +607,7 @@ async function cargarSecciones(negocioId, calendarId){
     if(!r.ok) throw new Error('HTTP '+r.status);
     SECCIONES = await r.json();
     if(SECCIONES.error) throw new Error(SECCIONES.error);
-    renderReservas(); renderDisponibilidad(); renderUpsell(); renderConfiguracion();
+    renderReservas(); renderDisponibilidad(); renderCobros(); renderUpsell(); renderConfiguracion();
   }catch(err){
     console.warn('No se pudieron cargar las secciones reales:', err);
   }
