@@ -84,10 +84,12 @@ function normalizarFechaISO(fechaISO: string): string {
 interface RawGoogleCalendarEvent {
   id?: string;
   summary?: string;
+  description?: string;
   htmlLink?: string;
   start?: { date?: string; dateTime?: string };
   end?: { date?: string; dateTime?: string };
   extendedProperties?: { private?: Record<string, string>; shared?: Record<string, string> };
+  attendees?: { email?: string; organizer?: boolean; self?: boolean }[];
 }
 
 export interface DisponibilidadParams {
@@ -101,18 +103,25 @@ export interface EventoCalendar {
   start: string;
   end: string;
   summary: string;
+  descripcion?: string;
   htmlLink?: string;
   unidad?: string;
+  emailHuesped?: string;
 }
 
 function mapearEvento(raw: RawGoogleCalendarEvent): EventoCalendar {
+  // El huésped es el attendee que no es ni organizador ni "self" (esa
+  // combinación identifica a la cuenta dueña del Calendar, no al huésped).
+  const attendeeHuesped = (raw.attendees ?? []).find((a) => !a.organizer && !a.self);
   return {
     id: raw.id ?? "",
     start: raw.start?.dateTime ?? raw.start?.date ?? "",
     end: raw.end?.dateTime ?? raw.end?.date ?? "",
     summary: raw.summary ?? "",
+    descripcion: raw.description,
     htmlLink: raw.htmlLink,
     unidad: raw.extendedProperties?.private?.unidad,
+    emailHuesped: attendeeHuesped?.email ?? raw.attendees?.[0]?.email,
   };
 }
 
