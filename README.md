@@ -85,3 +85,5 @@ fija del tool ("00000000_00") que ignora parámetros como `end_datetime` y
 reales que, sin este campo, las reservas se creaban con 30 minutos de
 duración en vez de respetar las fechas pedidas. Ya está corregido, pero
 importante no perder este dato si se agregan nuevas acciones de Composio.
+
+<!-- deploy trigger: activar MERCADOPAGO_ACCESS_TOKEN de produccion -->
