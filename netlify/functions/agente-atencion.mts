@@ -21,7 +21,8 @@
 
 import type { Context, Config } from "@netlify/functions";
 import { getPerfil } from "./lib/perfiles.mts";
-import { chequearDisponibilidad, crearReservaEnCalendar } from "./lib/composio-client.mts";
+import { buscarUnidadLibre, crearReservaEnCalendar } from "./lib/composio-client.mts";
+import { getUnidadesFisicas } from "./lib/negocios.mts";
 
 interface SolicitudAtencion {
   negocioId: string;
@@ -134,13 +135,16 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       perfil.catalogoUpsell
     );
 
-    const eventosExistentes = await chequearDisponibilidad({
+    const unidadesFisicas = getUnidadesFisicas(negocioId);
+
+    const unidadLibre = await buscarUnidadLibre({
       calendarId,
+      unidadesFisicas,
       fechaInicioISO: interpretacion.fechaInicioISO,
       fechaFinISO: interpretacion.fechaFinISO,
     });
 
-    if (eventosExistentes.length > 0) {
+    if (!unidadLibre) {
       return new Response(
         JSON.stringify({
           disponible: false,
@@ -152,17 +156,19 @@ export default async (req: Request, _context: Context): Promise<Response> => {
 
     const evento = await crearReservaEnCalendar({
       calendarId,
-      titulo: `Reserva ${perfil.nombreUnidad} — ${solicitud.emailHuesped}`,
-      descripcion: `Reserva generada por Agente de Atención HuésPED. Negocio: ${negocioId}. Personas: ${interpretacion.cantidadPersonas}.`,
+      titulo: `Reserva ${unidadLibre} — ${solicitud.emailHuesped}`,
+      descripcion: `Reserva generada por Agente de Atención HuésPED. Negocio: ${negocioId}. Unidad: ${unidadLibre}. Personas: ${interpretacion.cantidadPersonas}.`,
       fechaInicioISO: interpretacion.fechaInicioISO,
       fechaFinISO: interpretacion.fechaFinISO,
       emailHuesped,
+      unidad: unidadLibre,
     });
 
     return new Response(
       JSON.stringify({
         disponible: true,
         reservaId: evento.id,
+        unidadAsignada: unidadLibre,
         perfil: perfil.modalidad,
         interpretacion,
         upsellSugerido: interpretacion.intencionUpsell,
