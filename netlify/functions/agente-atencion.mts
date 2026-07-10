@@ -154,10 +154,14 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       );
     }
 
+    const lineaUpsell = interpretacion.intencionUpsell
+      ? ` Upsell sugerido: ${interpretacion.intencionUpsell}.`
+      : "";
+
     const evento = await crearReservaEnCalendar({
       calendarId,
       titulo: `Reserva ${unidadLibre} — ${solicitud.emailHuesped}`,
-      descripcion: `Reserva generada por Agente de Atención HuésPED. Negocio: ${negocioId}. Unidad: ${unidadLibre}. Personas: ${interpretacion.cantidadPersonas}.`,
+      descripcion: `Reserva generada por Agente de Atención HuésPED. Negocio: ${negocioId}. Unidad: ${unidadLibre}. Personas: ${interpretacion.cantidadPersonas}.${lineaUpsell}`,
       fechaInicioISO: interpretacion.fechaInicioISO,
       fechaFinISO: interpretacion.fechaFinISO,
       emailHuesped,
