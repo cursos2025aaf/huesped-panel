@@ -10,10 +10,12 @@
 // nunca se puede marcar como pagada una reserva que no tenga un pago
 // aprobado de verdad.
 //
-// Requisito EXTERNO (a cargo de Andrés, un paso de 1 minuto):
-//   MercadoPago > Tus integraciones > tu aplicación > Webhooks >
-//   agregar URL: https://huesped-iagentes.netlify.app/api/webhook-mercadopago
-//   y suscribirse al evento "Pagos" (payments).
+// Requisito EXTERNO (a cargo de Andrés, un paso de 1 minuto — YA HECHO):
+//   MercadoPago > Tus integraciones > tu aplicación > Webhooks (modo
+//   productivo) > URL: https://huesped-iagentes.netlify.app/api/webhook-mercadopago
+//   suscripto al evento "Pagos". La clave secreta que entrega MercadoPago
+//   al guardar se cargó como MERCADOPAGO_WEBHOOK_SECRET en Netlify y se usa
+//   acá para validar la firma HMAC de cada notificación (ver validarFirma).
 //
 // Cómo se correlaciona el pago con la reserva: al generar el link de pago
 // (agente-cobro.mts), se manda external_reference = reservaId, que es el
@@ -27,8 +29,49 @@
 // en vez de asumir "primary".
 
 import type { Context, Config } from "@netlify/functions";
+import crypto from "node:crypto";
 import { consultarPago } from "./lib/pagos-client.mts";
 import { actualizarPagoEnEvento } from "./lib/composio-client.mts";
+
+// Valida que la notificación realmente venga de MercadoPago (y no de un
+// tercero simulando un webhook), usando el esquema oficial de firma HMAC:
+// https://www.mercadopago.com.ar/developers/es/docs/your-integrations/notifications/webhooks
+// Si todavía no hay MERCADOPAGO_WEBHOOK_SECRET configurado, se deja pasar
+// la notificación (con una advertencia) para no romper mientras se termina
+// de configurar; una vez cargada la clave, se exige que la firma sea válida.
+function validarFirma(req: Request, url: URL): boolean {
+  const secret = Netlify.env.get("MERCADOPAGO_WEBHOOK_SECRET");
+  if (!secret) {
+    console.warn("MERCADOPAGO_WEBHOOK_SECRET no configurado: no se valida la firma del webhook.");
+    return true;
+  }
+
+  const xSignature = req.headers.get("x-signature");
+  const xRequestId = req.headers.get("x-request-id");
+  const dataId = url.searchParams.get("data.id") ?? url.searchParams.get("id");
+
+  if (!xSignature || !xRequestId || !dataId) {
+    console.error("Falta x-signature, x-request-id o data.id en la notificación: no se puede validar.");
+    return false;
+  }
+
+  const partes: Record<string, string> = {};
+  for (const par of xSignature.split(",")) {
+    const [clave, valor] = par.split("=");
+    if (clave) partes[clave.trim()] = (valor ?? "").trim();
+  }
+  const ts = partes.ts;
+  const v1 = partes.v1;
+  if (!ts || !v1) {
+    console.error("x-signature con formato inesperado:", xSignature);
+    return false;
+  }
+
+  const manifest = `id:${dataId.toLowerCase()};request-id:${xRequestId};ts:${ts};`;
+  const hashEsperado = crypto.createHmac("sha256", secret).update(manifest).digest("hex");
+
+  return hashEsperado === v1;
+}
 
 const CALENDAR_ID = "primary";
 
@@ -62,6 +105,11 @@ export default async (req: Request, _context: Context): Promise<Response> => {
 
   if (req.method !== "POST") {
     return new Response("Método no permitido", { status: 405 });
+  }
+
+  if (!validarFirma(req, url)) {
+    console.error("Firma de webhook de MercadoPago inválida — notificación rechazada.");
+    return new Response("Firma inválida", { status: 401 });
   }
 
   let body: any = null;
