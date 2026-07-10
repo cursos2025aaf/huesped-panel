@@ -110,3 +110,5 @@ duración en vez de respetar las fechas pedidas. Ya está corregido, pero
 importante no perder este dato si se agregan nuevas acciones de Composio.
 
 <!-- deploy trigger: activar MERCADOPAGO_ACCESS_TOKEN de produccion -->
+
+<!-- deploy trigger: activar MERCADOPAGO_WEBHOOK_SECRET -->
