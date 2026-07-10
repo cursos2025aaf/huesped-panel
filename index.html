@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HuésPED — Panel de Reservas · IAGENTES.TECH</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+  :root{
+    --navy:#0A2540; --navy-2:#0d3260; --celeste:#0EA5E9; --celeste-dk:#0284C7;
+    --verde:#10B981; --amber:#F59E0B; --red:#EF4444;
+    --gris:#64748B; --gris-lt:#94A3B8; --fondo:#F5F7FA; --blanco:#FFFFFF; --borde:#E6EAF0;
+    --ink:#0F172A;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Inter',system-ui,sans-serif;background:var(--fondo);color:var(--ink);}
+  a{color:inherit;text-decoration:none;}
+
+  .app{display:grid;grid-template-columns:264px 1fr;min-height:100vh;}
+
+  .sidebar{background:linear-gradient(180deg,var(--navy) 0%,#081b30 100%);color:#fff;padding:28px 20px;display:flex;flex-direction:column;gap:36px;position:sticky;top:0;height:100vh;}
+  .brand{display:flex;flex-direction:column;gap:2px;}
+  .brand-mark{display:flex;align-items:center;gap:8px;}
+  .brand-badge{background:#fff;color:var(--navy);font-weight:900;font-size:13px;letter-spacing:.02em;padding:4px 9px;border-radius:6px;}
+  .brand-badge span{color:var(--celeste);}
+  .brand-sub{font-size:10.5px;color:var(--gris-lt);letter-spacing:.08em;text-transform:uppercase;margin-top:6px;}
+  .product-name{font-size:22px;font-weight:800;margin-top:14px;letter-spacing:-.01em;}
+  .product-name em{font-style:normal;color:var(--celeste);}
+
+  .nav{display:flex;flex-direction:column;gap:4px;}
+  .nav-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;font-size:13.5px;font-weight:500;color:#B9C4D4;cursor:pointer;transition:.15s;}
+  .nav-item .ic{width:18px;text-align:center;font-size:15px;}
+  .nav-item:hover{background:rgba(255,255,255,.06);color:#fff;}
+  .nav-item.active{background:rgba(14,165,233,.16);color:#fff;box-shadow:inset 3px 0 0 var(--celeste);}
+
+  .sidebar-foot{margin-top:auto;padding-top:20px;border-top:1px solid rgba(255,255,255,.1);font-size:11.5px;color:var(--gris-lt);line-height:1.6;}
+  .sidebar-foot strong{color:#fff;}
+
+  .main{padding:32px 40px 60px;max-width:1280px;}
+  .topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;flex-wrap:wrap;gap:16px;}
+  .topbar h1{font-size:25px;font-weight:800;letter-spacing:-.01em;}
+  .topbar p{font-size:13.5px;color:var(--gris);margin-top:4px;}
+
+  .modalidad-switch{display:flex;background:var(--blanco);border:1px solid var(--borde);border-radius:12px;padding:5px;gap:4px;box-shadow:0 1px 2px rgba(15,23,42,.04);}
+  .mode-btn{padding:8px 16px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--gris);cursor:pointer;transition:.15s;display:flex;align-items:center;gap:6px;white-space:nowrap;}
+  .mode-btn:hover{color:var(--navy);}
+  .mode-btn.active{background:var(--navy);color:#fff;}
+
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-bottom:28px;}
+  .stat-card{background:var(--blanco);border:1px solid var(--borde);border-radius:16px;padding:20px 22px;box-shadow:0 1px 3px rgba(15,23,42,.05);}
+  .stat-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;}
+  .stat-ic{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;}
+  .stat-trend{font-size:11.5px;font-weight:700;padding:3px 8px;border-radius:99px;}
+  .trend-up{background:#ECFDF5;color:var(--verde);}
+  .trend-warn{background:#FFFBEB;color:var(--amber);}
+  .stat-num{font-size:28px;font-weight:800;letter-spacing:-.02em;line-height:1;margin-bottom:6px;}
+  .stat-lbl{font-size:12.5px;color:var(--gris);font-weight:500;}
+
+  .grid-2{display:grid;grid-template-columns:1.4fr 1fr;gap:20px;margin-bottom:24px;align-items:start;}
+  .panel{background:var(--blanco);border:1px solid var(--borde);border-radius:16px;padding:24px 26px;box-shadow:0 1px 3px rgba(15,23,42,.05);}
+  .panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;}
+  .panel-head h3{font-size:15.5px;font-weight:700;}
+  .panel-head .muted{font-size:12px;color:var(--gris);}
+  .link-btn{font-size:12.5px;font-weight:600;color:var(--celeste-dk);cursor:pointer;}
+
+  table{width:100%;border-collapse:collapse;}
+  thead th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--gris-lt);font-weight:700;padding:0 10px 10px;border-bottom:1px solid var(--borde);}
+  tbody td{padding:13px 10px;font-size:13px;border-bottom:1px solid #F1F4F8;}
+  tbody tr:last-child td{border-bottom:none;}
+  .guest{display:flex;align-items:center;gap:10px;}
+  .avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--celeste),var(--navy));color:#fff;font-size:11.5px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .guest-name{font-weight:600;font-size:13px;}
+  .guest-sub{font-size:11.5px;color:var(--gris);}
+  .badge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px;display:inline-block;}
+  .badge-ok{background:#ECFDF5;color:#059669;}
+  .badge-pend{background:#FFFBEB;color:#D97706;}
+  .badge-new{background:#EFF6FF;color:#2563EB;}
+  .upsell-tag{font-size:11px;color:var(--celeste-dk);font-weight:600;background:#F0F9FF;padding:3px 8px;border-radius:6px;}
+
+  .occ-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid #F1F4F8;}
+  .occ-row:last-child{border-bottom:none;}
+  .occ-label{width:86px;font-size:12.5px;font-weight:600;flex-shrink:0;}
+  .occ-bar-bg{flex:1;height:8px;background:#EEF2F6;border-radius:99px;overflow:hidden;}
+  .occ-bar-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--celeste),var(--verde));}
+  .occ-pct{width:38px;text-align:right;font-size:12px;font-weight:700;color:var(--gris);}
+
+  .chart-wrap{height:190px;}
+
+  .agent-flow{display:flex;flex-direction:column;gap:10px;}
+  .flow-item{display:flex;gap:12px;align-items:flex-start;padding:12px;border-radius:12px;background:#FAFBFD;border:1px solid var(--borde);}
+  .flow-dot{width:26px;height:26px;border-radius:50%;background:var(--navy);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .flow-item.b .flow-dot{background:var(--celeste);}
+  .flow-txt strong{font-size:12.5px;display:block;margin-bottom:2px;}
+  .flow-txt span{font-size:11.5px;color:var(--gris);}
+
+  .footer-note{text-align:center;font-size:11.5px;color:var(--gris-lt);margin-top:36px;}
+
+  @media (max-width:980px){
+    .app{grid-template-columns:1fr;}
+    .sidebar{position:relative;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;}
+    .nav{flex-direction:row;flex-wrap:wrap;}
+    .stat-grid{grid-template-columns:repeat(2,1fr);}
+    .grid-2{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">
+        <span class="brand-badge">IAGENTES<span>.TECH</span></span>
+      </div>
+      <div class="brand-sub">Agentes de IA a medida</div>
+      <div class="product-name">Hués<em>PED</em></div>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-item active"><span class="ic">◇</span> Resumen</div>
+      <div class="nav-item"><span class="ic">▤</span> Reservas</div>
+      <div class="nav-item"><span class="ic">◎</span> Disponibilidad</div>
+      <div class="nav-item"><span class="ic">$</span> Cobros</div>
+      <div class="nav-item"><span class="ic">↗</span> Upsell</div>
+      <div class="nav-item"><span class="ic">⚙</span> Configuración</div>
+    </nav>
+
+    <div class="sidebar-foot">
+      Modalidad activa:<br>
+      <strong id="foot-modalidad">Cabañas</strong> · perfil cargado automáticamente
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1 id="page-title">Resumen — Complejo Los Alerces</h1>
+        <p id="page-sub">Hoy es viernes 10 de julio de 2026 · Agente A y Agente B activos</p>
+      </div>
+      <div class="modalidad-switch" id="mode-switch">
+        <div class="mode-btn" data-mode="balneario">🏖️ Balneario</div>
+        <div class="mode-btn" data-mode="camping">⛺ Camping</div>
+        <div class="mode-btn active" data-mode="cabanas">🏡 Cabañas</div>
+        <div class="mode-btn" data-mode="hosteria">🏨 Hostería</div>
+      </div>
+    </div>
+
+    <div class="stat-grid" id="stat-grid"></div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head">
+          <h3 id="tbl-title">Próximas reservas</h3>
+          <span class="link-btn">Ver todas →</span>
+        </div>
+        <table>
+          <thead><tr><th>Huésped</th><th id="th-unidad">Unidad</th><th>Fechas</th><th>Upsell</th><th>Estado</th></tr></thead>
+          <tbody id="res-body"></tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Ocupación por unidad</h3>
+          <span class="muted" id="occ-muted">próx. 7 días</span>
+        </div>
+        <div id="occ-list"></div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Ingresos — reservas vs. upsell</h3>
+          <span class="muted">últimos 6 meses</span>
+        </div>
+        <div class="chart-wrap"><canvas id="chart-ingresos"></canvas></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3>Cómo trabajan los agentes</h3></div>
+        <div class="agent-flow">
+          <div class="flow-item">
+            <div class="flow-dot">A</div>
+            <div class="flow-txt"><strong>Agente de Atención</strong><span>Responde la consulta, chequea Calendar y confirma según el perfil de <b id="flow-modalidad">Cabañas</b>.</span></div>
+          </div>
+          <div class="flow-item">
+            <div class="flow-dot">+</div>
+            <div class="flow-txt"><strong>Upsell contextual</strong><span id="flow-upsell">Ofrece desayuno y cochera según fechas y cantidad de huéspedes.</span></div>
+          </div>
+          <div class="flow-item b">
+            <div class="flow-dot">B</div>
+            <div class="flow-txt"><strong>Agente de Cobro</strong><span id="flow-cobro">Genera el link de seña (30%) por MercadoPago o Stripe y lo envía por email.</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="footer-note">HuésPED · Sistema Multiagente de Reservas — IAGENTES.TECH © 2026</p>
+  </main>
+</div>
+
+<script>
+const DATA = {
+  balneario: {
+    negocio: "Balneario Marea Alta", unidad: "Carpa", unidadPl: "Carpas",
+    stats: [
+      {ic:"🏖️", bg:"#F0F9FF", label:"Carpas ocupadas hoy", val:"38 / 50", trend:"76%", trendType:"up"},
+      {ic:"💵", bg:"#ECFDF5", label:"Ingresos del día", val:"$412.000", trend:"+18%", trendType:"up"},
+      {ic:"⏳", bg:"#FFFBEB", label:"Señas pendientes", val:"6", trend:"atención", trendType:"warn"},
+      {ic:"↗", bg:"#F0F9FF", label:"Upsell del mes", val:"$96.500", trend:"+9%", trendType:"up"},
+    ],
+    reservas: [
+      {n:"Fam. Giménez", init:"FG", u:"Carpa 12", f:"10 jul · día completo", up:"Reposera x2", estado:"ok"},
+      {n:"Lucía Ortega", init:"LO", u:"Sombrilla 4", f:"10 jul · media tarde", up:"—", estado:"pend"},
+      {n:"Martín Paz", init:"MP", u:"Carpa 27", f:"11 jul · día completo", up:"Servicio parador", estado:"new"},
+      {n:"Fam. Suárez", init:"FS", u:"Carpa 8", f:"11 jul · día completo", up:"Sombrilla extra", estado:"ok"},
+    ],
+    occ: [{l:"Sector A",p:82},{l:"Sector B",p:64},{l:"Sector C",p:91},{l:"VIP",p:45}],
+    upsellTxt: "Ofrece reposera extra o servicio de parador según la cantidad de personas.",
+    cobroTxt: "Cobra seña por transferencia/MercadoPago y el saldo en el lugar (efectivo o POS).",
+  },
+  camping: {
+    negocio: "Camping Río Claro", unidad: "Sitio", unidadPl: "Sitios",
+    stats: [
+      {ic:"⛺", bg:"#F0FDF4", label:"Sitios ocupados", val:"31 / 40", trend:"78%", trendType:"up"},
+      {ic:"💵", bg:"#ECFDF5", label:"Ingresos del mes", val:"$1.240.000", trend:"+12%", trendType:"up"},
+      {ic:"⏳", bg:"#FFFBEB", label:"Señas pendientes", val:"4", trend:"atención", trendType:"warn"},
+      {ic:"↗", bg:"#F0F9FF", label:"Upsell del mes", val:"$185.000", trend:"+22%", trendType:"up"},
+    ],
+    reservas: [
+      {n:"Grupo Andes Trek", init:"AT", u:"Sitio 14", f:"12-15 jul · 3 noches", up:"Alquiler carpa 4p", estado:"ok"},
+      {n:"Fam. Rodríguez", init:"FR", u:"Sitio 3", f:"13-14 jul · 1 noche", up:"Leña x2", estado:"new"},
+      {n:"Bruno Klein", init:"BK", u:"Sitio 22", f:"14-16 jul · 2 noches", up:"Kayak doble", estado:"ok"},
+      {n:"Fam. Ibáñez", init:"FI", u:"Sitio 9", f:"14-17 jul · 3 noches", up:"—", estado:"pend"},
+    ],
+    occ: [{l:"Sector río",p:88},{l:"Sector bosque",p:57},{l:"Sector fogón",p:70},{l:"Motorhome",p:40}],
+    upsellTxt: "Sugiere leña, alquiler de carpa o kayak según la duración de la estadía.",
+    cobroTxt: "Seña anticipada para asegurar el sitio + saldo online o al llegar.",
+  },
+  cabanas: {
+    negocio: "Complejo Los Alerces", unidad: "Cabaña", unidadPl: "Cabañas",
+    stats: [
+      {ic:"🏡", bg:"#F0F9FF", label:"Cabañas ocupadas", val:"9 / 12", trend:"75%", trendType:"up"},
+      {ic:"💵", bg:"#ECFDF5", label:"Ingresos del mes", val:"$2.860.000", trend:"+15%", trendType:"up"},
+      {ic:"⏳", bg:"#FFFBEB", label:"Señas pendientes", val:"2", trend:"atención", trendType:"warn"},
+      {ic:"↗", bg:"#F0F9FF", label:"Upsell del mes", val:"$310.000", trend:"+27%", trendType:"up"},
+    ],
+    reservas: [
+      {n:"Fam. Torres", init:"FT", u:"Cabaña 5", f:"12-14 jul · 2 noches", up:"Desayuno x4", estado:"ok"},
+      {n:"Valentina Ruiz", init:"VR", u:"Cabaña 2", f:"13-15 jul · 2 noches", up:"Cochera", estado:"new"},
+      {n:"Fam. Ibarra", init:"FI", u:"Cabaña 9", f:"14-18 jul · 4 noches", up:"Kit de mate", estado:"ok"},
+      {n:"Diego Molina", init:"DM", u:"Cabaña 3", f:"15-16 jul · 1 noche", up:"—", estado:"pend"},
+    ],
+    occ: [{l:"Vista lago",p:92},{l:"Bosque",p:68},{l:"Standard",p:55},{l:"Premium",p:80}],
+    upsellTxt: "Ofrece desayuno, cochera o kit de pesca/mate según fechas y huéspedes.",
+    cobroTxt: "Seña 30-50% al confirmar + saldo antes de la llegada.",
+  },
+  hosteria: {
+    negocio: "Hostería Vista al Lago", unidad: "Habitación", unidadPl: "Habitaciones",
+    stats: [
+      {ic:"🏨", bg:"#F0F9FF", label:"Habitaciones ocupadas", val:"22 / 28", trend:"79%", trendType:"up"},
+      {ic:"💵", bg:"#ECFDF5", label:"Ingresos del mes", val:"$5.140.000", trend:"+11%", trendType:"up"},
+      {ic:"⏳", bg:"#FFFBEB", label:"Pagos pendientes", val:"3", trend:"atención", trendType:"warn"},
+      {ic:"↗", bg:"#F0F9FF", label:"Upsell del mes", val:"$540.000", trend:"+19%", trendType:"up"},
+    ],
+    reservas: [
+      {n:"J. & M. Keller (DE)", init:"JK", u:"Suite 401", f:"12-16 jul · 4 noches", up:"Traslado aeropuerto", estado:"ok"},
+      {n:"Fam. Castro", init:"FC", u:"Doble 205", f:"13-15 jul · 2 noches", up:"Media pensión", estado:"new"},
+      {n:"S. Alvez", init:"SA", u:"Triple 310", f:"14-17 jul · 3 noches", up:"Excursión al glaciar", estado:"ok"},
+      {n:"R. Fontán", init:"RF", u:"Doble 102", f:"15-16 jul · 1 noche", up:"—", estado:"pend"},
+    ],
+    occ: [{l:"Standard",p:85},{l:"Doble",p:74},{l:"Triple",p:60},{l:"Suite",p:90}],
+    upsellTxt: "Sugiere media pensión, traslados o excursiones según origen y duración.",
+    cobroTxt: "Pago anticipado completo o seña alta vía Stripe (huésped internacional) o MercadoPago (local).",
+  }
+};
+
+let chart;
+function render(mode){
+  const d = DATA[mode];
+  document.getElementById('page-title').textContent = `Resumen — ${d.negocio}`;
+  document.getElementById('foot-modalidad').textContent = mode[0].toUpperCase()+mode.slice(1);
+  document.getElementById('flow-modalidad').textContent = mode[0].toUpperCase()+mode.slice(1);
+  document.getElementById('th-unidad').textContent = d.unidad;
+  document.getElementById('flow-upsell').textContent = d.upsellTxt;
+  document.getElementById('flow-cobro').textContent = d.cobroTxt;
+  document.getElementById('tbl-title').textContent = `Próximas reservas · ${d.unidadPl}`;
+
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active', b.dataset.mode===mode));
+
+  const sg = document.getElementById('stat-grid');
+  sg.innerHTML = d.stats.map(s=>`
+    <div class="stat-card">
+      <div class="stat-top">
+        <div class="stat-ic" style="background:${s.bg}">${s.ic}</div>
+        <div class="stat-trend ${s.trendType==='up'?'trend-up':'trend-warn'}">${s.trend}</div>
+      </div>
+      <div class="stat-num">${s.val}</div>
+      <div class="stat-lbl">${s.label}</div>
+    </div>`).join('');
+
+  const badgeMap = {ok:['badge-ok','Confirmada'], pend:['badge-pend','Seña pendiente'], new:['badge-new','Nueva']};
+  const rb = document.getElementById('res-body');
+  rb.innerHTML = d.reservas.map(r=>{
+    const [cls,label] = badgeMap[r.estado];
+    return `<tr>
+      <td><div class="guest"><div class="avatar">${r.init}</div><div><div class="guest-name">${r.n}</div><div class="guest-sub">Huésped</div></div></div></td>
+      <td>${r.u}</td>
+      <td>${r.f}</td>
+      <td>${r.up==='—' ? '<span style="color:#B8C0CC">—</span>' : `<span class="upsell-tag">${r.up}</span>`}</td>
+      <td><span class="badge ${cls}">${label}</span></td>
+    </tr>`;
+  }).join('');
+
+  const oc = document.getElementById('occ-list');
+  oc.innerHTML = d.occ.map(o=>`
+    <div class="occ-row">
+      <div class="occ-label">${o.l}</div>
+      <div class="occ-bar-bg"><div class="occ-bar-fill" style="width:${o.p}%"></div></div>
+      <div class="occ-pct">${o.p}%</div>
+    </div>`).join('');
+
+  const ctx = document.getElementById('chart-ingresos').getContext('2d');
+  const meses = ['Feb','Mar','Abr','May','Jun','Jul'];
+  const base = d.stats[1].val.replace(/[^\d]/g,'')/6;
+  const reservasData = meses.map((_,i)=> Math.round(base*(0.7+0.35*Math.sin(i)+0.15*i)) );
+  const upsellData = reservasData.map(v=> Math.round(v*0.12*(1+Math.random()*0.4)) );
+  if(chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type:'bar',
+    data:{ labels:meses, datasets:[
+      {label:'Reservas', data:reservasData, backgroundColor:'#0EA5E9', borderRadius:6, maxBarThickness:26},
+      {label:'Upsell', data:upsellData, backgroundColor:'#10B981', borderRadius:6, maxBarThickness:26},
+    ]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:'bottom', labels:{ boxWidth:10, font:{size:11, family:'Inter'} } } },
+      scales:{ y:{ grid:{color:'#F1F4F8'}, ticks:{font:{size:10}} }, x:{ grid:{display:false}, ticks:{font:{size:11}} } }
+    }
+  });
+}
+
+document.getElementById('mode-switch').addEventListener('click', e=>{
+  const btn = e.target.closest('.mode-btn');
+  if(!btn) return;
+  render(btn.dataset.mode);
+});
+
+render('cabanas');
+</script>
+</body>
+</html>
