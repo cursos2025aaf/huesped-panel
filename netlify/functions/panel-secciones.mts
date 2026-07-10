@@ -26,11 +26,11 @@ function fechaISOCorta(fecha: Date): string {
   return fecha.toISOString().slice(0, 10);
 }
 function parsearPersonas(descripcion?: string): string | null {
-  const m = descripcion?.match(/Personas:\\s*(\\d+)/);
+  const m = descripcion?.match(/Personas:\s*(\d+)/);
   return m ? m[1] : null;
 }
 function parsearUpsell(descripcion?: string): string | null {
-  const m = descripcion?.match(/Upsell sugerido:\\s*([^.]+)\\./);
+  const m = descripcion?.match(/Upsell sugerido:\s*([^.]+)\./);
   return m ? m[1].trim() : null;
 }
 function iniciales(email?: string): string {
