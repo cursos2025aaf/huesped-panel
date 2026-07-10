@@ -64,8 +64,10 @@ async function interpretarConsulta(
         `Sos el Agente de Atención de HuésPED para un negocio que reserva "${perfilNombreUnidad}". ` +
         `Hoy es ${hoy}. Extraé de la consulta del huésped: fecha de inicio, fecha de fin, cantidad de ` +
         `personas, y si corresponde sugerir alguno de estos extras según el contexto: ${catalogoUpsell.join(", ")}. ` +
-        `Respondé EXCLUSIVAMENTE con JSON válido con las claves: fechaInicioISO, fechaFinISO, ` +
-        `cantidadPersonas, intencionUpsell (string o null). Sin texto adicional.`,
+        `Respondé EXCLUSIVAMENTE con JSON válido con las claves: fechaInicioISO, fechaFinISO ` +
+        `(SIEMPRE en formato ISO 8601 completo con hora y zona UTC, ej: "2026-07-20T00:00:00Z" — ` +
+        `si el huésped no da una hora puntual, usá T00:00:00Z), cantidadPersonas, ` +
+        `intencionUpsell (string o null). Sin texto adicional.`,
       messages: [{ role: "user", content: mensaje }],
     }),
   });
