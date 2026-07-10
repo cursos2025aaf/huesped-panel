@@ -138,7 +138,7 @@
   <main class="main">
     <div class="topbar">
       <div>
-        <h1 id="page-title">Resumen — Complejo Los Alerces</h1>
+        <h1 id="page-title">Resumen — Complejo Los Alerces <span id="data-badge" style="display:inline-block;margin-left:8px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;vertical-align:middle;"></span></h1>
         <p id="page-sub">Hoy es viernes 10 de julio de 2026 · Agente A y Agente B activos</p>
       </div>
       <div class="modalidad-switch" id="mode-switch">
@@ -289,8 +289,22 @@ const DATA = {
 let chart;
 function render(mode){
   const d = DATA[mode];
-  document.getElementById('page-title').textContent = `Resumen — ${d.negocio}`;
+  const titleEl = document.getElementById('page-title');
+  titleEl.childNodes[0].textContent = `Resumen — ${d.negocio} `;
   document.getElementById('foot-modalidad').textContent = d.label;
+  const badge = document.getElementById('data-badge');
+  if(badge){
+    if(mode==='cabanas' && d.esReal){
+      badge.textContent = '● Datos en vivo (Calendar)';
+      badge.style.background = '#ECFDF5'; badge.style.color = '#059669';
+    } else if(mode==='cabanas' && d.esReal===false){
+      badge.textContent = '○ Datos de ejemplo (no se pudo conectar a Calendar)';
+      badge.style.background = '#FFFBEB'; badge.style.color = '#B45309';
+    } else {
+      badge.textContent = '○ Datos de ejemplo';
+      badge.style.background = '#F1F4F8'; badge.style.color = '#6B7280';
+    }
+  }
   document.getElementById('flow-modalidad').textContent = d.label;
   document.getElementById('th-unidad').textContent = d.unidad;
   document.getElementById('flow-upsell').textContent = d.upsellTxt;
@@ -357,7 +371,21 @@ document.getElementById('mode-switch').addEventListener('click', e=>{
   render(btn.dataset.mode);
 });
 
-render('cabanas');
+async function cargarDatosReales(negocioId, calendarId){
+  try{
+    const r = await fetch(`/api/panel-datos?negocioId=${encodeURIComponent(negocioId)}&calendarId=${encodeURIComponent(calendarId)}`);
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const real = await r.json();
+    if(real.error) throw new Error(real.error);
+    Object.assign(DATA.cabanas, real);
+    DATA.cabanas.esReal = true;
+  }catch(err){
+    console.warn('No se pudieron cargar datos reales de Calendar, se muestran datos de ejemplo:', err);
+    DATA.cabanas.esReal = false;
+  }
+}
+
+cargarDatosReales('los-alerces','primary').then(()=> render('cabanas'));
 </script>
 </body>
 </html>
