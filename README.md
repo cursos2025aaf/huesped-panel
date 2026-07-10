@@ -16,6 +16,8 @@ Ver el briefing completo en Drive: `BRIEFING_HuesPED_Sistema_Multiagente_Reserva
 - `netlify/functions/agente-atencion.mts` — Agente A: `POST /api/atencion`. Ahora asigna una unidad física concreta (ej. "Cabaña 3") por cada reserva, no solo verifica disponibilidad genérica.
 - `netlify/functions/agente-cobro.mts` — Agente B: `POST /api/cobro`.
 - `netlify/functions/webhook-whatsapp.mts` — canal de entrada real por WhatsApp Business (Meta Cloud API vía Composio). Construido y desplegado; falta conectar la cuenta real (ver sección abajo).
+- `netlify/functions/webhook-mercadopago.mts` — recibe la notificación de MercadoPago cuando cambia el estado de un pago, consulta el pago real contra la API (nunca confía en el body del webhook) y etiqueta el evento de Calendar correspondiente (`extendedProperties.private.pagoEstado/pagoMontoARS/pagoFecha/pagoId`). Construido y desplegado; falta un paso externo (ver sección abajo).
+- `netlify/functions/panel-secciones.mts` — endpoint único (`/api/panel-secciones`) que alimenta las 5 pestañas del panel con datos reales: Reservas, Disponibilidad, Cobros, Upsell y Configuración.
 
 ## Variables de entorno necesarias (Netlify > Site configuration > Environment variables)
 
@@ -74,6 +76,27 @@ todavía NO dispara el link de pago automáticamente — HuésPED no tiene hoy
 una tabla de precios/tarifas por unidad, y calcular un monto a cobrar sin
 esa tarifa real sería inventar una cifra. En cuanto exista una tarifa por
 negocio, se puede sumar ese último paso.
+
+## Pestaña Cobros — qué falta para activarla del todo
+
+El código ya está construido y desplegado (`/api/webhook-mercadopago` +
+`cobrosResumen` en el panel), pero falta un único paso externo, de 1 minuto,
+que solo Andrés puede hacer desde el dashboard de MercadoPago:
+
+1. Entrar a MercadoPago > Tus integraciones > la aplicación en uso > Webhooks.
+2. Agregar la URL: `https://huesped-iagentes.netlify.app/api/webhook-mercadopago`
+3. Suscribirse al evento "Pagos" (payments).
+
+Cómo funciona: al generar un link de cobro (Agente de Cobro), se guarda
+`external_reference = reservaId` (el mismo id del evento de Calendar). Cuando
+el huésped paga, MercadoPago avisa al webhook; el webhook nunca confía en
+el aviso por sí solo — vuelve a consultar el pago real contra la API de
+MercadoPago con el access token real, y solo entonces etiqueta el evento de
+Calendar correspondiente con el estado verdadero (`approved`, `pending`,
+`rejected`, etc.), el monto real cobrado y la fecha real. La pestaña Cobros
+del panel lee esas etiquetas — no inventa ni estima montos: una reserva sin
+pago registrado simplemente figura como "Sin registrar" hasta que se
+confirme un pago real vía este webhook.
 
 ## Nota técnica importante (Composio)
 
