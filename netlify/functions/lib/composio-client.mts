@@ -3,21 +3,22 @@
 // Cliente mínimo para invocar acciones de Composio (Calendar, Gmail) desde
 // las Netlify Functions de HuésPED. Requiere las variables de entorno:
 //   COMPOSIO_API_KEY   - API key de la cuenta Composio (iagentes.tech)
-//   COMPOSIO_ENTITY_ID - id de entidad conectada (por defecto "default")
+//   COMPOSIO_ENTITY_ID - id de entidad/usuario conectado (por defecto "default")
 //
-// Documentación de acciones: https://docs.composio.dev
+// Usa la API REST v3 de Composio (la v2 fue dada de baja — devuelve 410).
+// Documentación: https://docs.composio.dev/api-reference
 
-const COMPOSIO_BASE_URL = "https://backend.composio.dev/api/v2";
+const COMPOSIO_BASE_URL = "https://backend.composio.dev/api/v3";
 
 interface ComposioExecuteResponse<T = unknown> {
   successful: boolean;
   data: T;
-  error?: string;
+  error?: string | null;
 }
 
 async function executeAction<T = unknown>(
-  actionName: string,
-  params: Record<string, unknown>
+  actionSlug: string,
+  args: Record<string, unknown>
 ): Promise<T> {
   const apiKey = Netlify.env.get("COMPOSIO_API_KEY");
   const entityId = Netlify.env.get("COMPOSIO_ENTITY_ID") ?? "default";
@@ -26,28 +27,47 @@ async function executeAction<T = unknown>(
     throw new Error("Falta configurar COMPOSIO_API_KEY en las variables de entorno de Netlify.");
   }
 
-  const res = await fetch(`${COMPOSIO_BASE_URL}/actions/${actionName}/execute`, {
+  const res = await fetch(`${COMPOSIO_BASE_URL}/tools/execute/${actionSlug}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-API-Key": apiKey,
+      "x-api-key": apiKey,
     },
     body: JSON.stringify({
-      entityId,
-      input: params,
+      // Se envían ambos por compatibilidad: la cuenta se conectó originalmente
+      // como entidad "default"; user_id es el campo vigente en la API v3
+      // (entity_id queda deprecado pero todavía se acepta).
+      entity_id: entityId,
+      user_id: entityId,
+      arguments: args,
     }),
   });
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Composio ${actionName} respondió ${res.status}: ${text}`);
+    throw new Error(`Composio ${actionSlug} respondió ${res.status}: ${text}`);
   }
 
   const json = (await res.json()) as ComposioExecuteResponse<T>;
   if (!json.successful) {
-    throw new Error(`Composio ${actionName} falló: ${json.error ?? "sin detalle"}`);
+    throw new Error(`Composio ${actionSlug} falló: ${json.error ?? "sin detalle"}`);
   }
   return json.data;
+}
+
+// Asegura que una fecha ISO tenga zona horaria explícita (Z u offset), tal
+// como lo exige la API de Google Calendar. Si Claude devuelve una fecha sin
+// zona, asumimos UTC en lugar de fallar.
+function conZonaHoraria(fechaISO: string): string {
+  return /[Zz]$|[+-]\d{2}:?\d{2}$/.test(fechaISO) ? fechaISO : `${fechaISO}Z`;
+}
+
+interface RawGoogleCalendarEvent {
+  id?: string;
+  summary?: string;
+  htmlLink?: string;
+  start?: { date?: string; dateTime?: string };
+  end?: { date?: string; dateTime?: string };
 }
 
 export interface DisponibilidadParams {
@@ -61,6 +81,17 @@ export interface EventoCalendar {
   start: string;
   end: string;
   summary: string;
+  htmlLink?: string;
+}
+
+function mapearEvento(raw: RawGoogleCalendarEvent): EventoCalendar {
+  return {
+    id: raw.id ?? "",
+    start: raw.start?.dateTime ?? raw.start?.date ?? "",
+    end: raw.end?.dateTime ?? raw.end?.date ?? "",
+    summary: raw.summary ?? "",
+    htmlLink: raw.htmlLink,
+  };
 }
 
 // Chequea eventos existentes en el rango solicitado para decidir si la
@@ -70,16 +101,16 @@ export interface EventoCalendar {
 export async function chequearDisponibilidad(
   params: DisponibilidadParams
 ): Promise<EventoCalendar[]> {
-  const data = await executeAction<{ items: EventoCalendar[] }>(
-    "GOOGLECALENDAR_LIST_EVENTS",
+  const data = await executeAction<{ items?: RawGoogleCalendarEvent[] }>(
+    "GOOGLECALENDAR_EVENTS_LIST",
     {
       calendarId: params.calendarId,
-      timeMin: params.fechaInicioISO,
-      timeMax: params.fechaFinISO,
+      timeMin: conZonaHoraria(params.fechaInicioISO),
+      timeMax: conZonaHoraria(params.fechaFinISO),
       singleEvents: true,
     }
   );
-  return data.items ?? [];
+  return (data.items ?? []).map(mapearEvento);
 }
 
 export interface CrearReservaParams {
@@ -94,14 +125,20 @@ export interface CrearReservaParams {
 export async function crearReservaEnCalendar(
   params: CrearReservaParams
 ): Promise<EventoCalendar> {
-  return executeAction<EventoCalendar>("GOOGLECALENDAR_CREATE_EVENT", {
-    calendarId: params.calendarId,
-    summary: params.titulo,
-    description: params.descripcion,
-    start: { dateTime: params.fechaInicioISO },
-    end: { dateTime: params.fechaFinISO },
-    attendees: [{ email: params.emailHuesped }],
-  });
+  const data = await executeAction<{ response_data: RawGoogleCalendarEvent }>(
+    "GOOGLECALENDAR_CREATE_EVENT",
+    {
+      calendar_id: params.calendarId,
+      summary: params.titulo,
+      description: params.descripcion,
+      start_datetime: conZonaHoraria(params.fechaInicioISO),
+      end_datetime: conZonaHoraria(params.fechaFinISO),
+      attendees: [params.emailHuesped],
+      // Sin link de Google Meet: no aplica a una reserva de alojamiento.
+      create_meeting_room: false,
+    }
+  );
+  return mapearEvento(data.response_data);
 }
 
 export interface EnviarEmailParams {
