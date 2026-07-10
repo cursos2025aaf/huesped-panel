@@ -219,3 +219,21 @@ export async function enviarEmail(params: EnviarEmailParams): Promise<void> {
     is_html: true,
   });
 }
+
+export interface EnviarWhatsAppParams {
+  phoneNumberId: string;
+  paraNumero: string;
+  texto: string;
+}
+
+// Envía un mensaje de texto de WhatsApp Business (Composio toolkit WHATSAPP).
+// Requiere que la cuenta de WhatsApp Business ya esté conectada en Composio
+// (Auth Config + conexión, igual que Calendar/Gmail) y que WHATSAPP_PHONE_NUMBER_ID
+// esté cargado en las variables de entorno de Netlify.
+export async function enviarWhatsApp(params: EnviarWhatsAppParams): Promise<void> {
+  await executeAction("WHATSAPP_SEND_MESSAGE", {
+    phone_number_id: params.phoneNumberId,
+    to_number: params.paraNumero,
+    text: params.texto,
+  });
+}
