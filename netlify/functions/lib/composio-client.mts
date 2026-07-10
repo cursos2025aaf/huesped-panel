@@ -55,11 +55,23 @@ async function executeAction<T = unknown>(
   return json.data;
 }
 
-// Asegura que una fecha ISO tenga zona horaria explícita (Z u offset), tal
-// como lo exige la API de Google Calendar. Si Claude devuelve una fecha sin
-// zona, asumimos UTC en lugar de fallar.
-function conZonaHoraria(fechaISO: string): string {
-  return /[Zz]$|[+-]\d{2}:?\d{2}$/.test(fechaISO) ? fechaISO : `${fechaISO}Z`;
+// Normaliza una fecha/hora a un formato RFC3339 completo y válido, tal como
+// lo exige la API de Google Calendar. Claude no siempre devuelve el mismo
+// formato (a veces solo "2026-07-20", a veces con hora, a veces con zona),
+// así que este normalizador cubre los tres casos en lugar de asumir que
+// siempre llega "limpio".
+function normalizarFechaISO(fechaISO: string): string {
+  const soloFecha = /^\d{4}-\d{2}-\d{2}$/;
+  if (soloFecha.test(fechaISO)) {
+    // Fecha sin hora (reserva de día completo): asumimos medianoche UTC.
+    return `${fechaISO}T00:00:00Z`;
+  }
+  if (/[Zz]$|[+-]\d{2}:?\d{2}$/.test(fechaISO)) {
+    // Ya tiene zona horaria explícita.
+    return fechaISO;
+  }
+  // Tiene hora pero sin zona: asumimos UTC.
+  return `${fechaISO}Z`;
 }
 
 interface RawGoogleCalendarEvent {
@@ -105,8 +117,8 @@ export async function chequearDisponibilidad(
     "GOOGLECALENDAR_EVENTS_LIST",
     {
       calendarId: params.calendarId,
-      timeMin: conZonaHoraria(params.fechaInicioISO),
-      timeMax: conZonaHoraria(params.fechaFinISO),
+      timeMin: normalizarFechaISO(params.fechaInicioISO),
+      timeMax: normalizarFechaISO(params.fechaFinISO),
       singleEvents: true,
     }
   );
@@ -131,8 +143,8 @@ export async function crearReservaEnCalendar(
       calendar_id: params.calendarId,
       summary: params.titulo,
       description: params.descripcion,
-      start_datetime: conZonaHoraria(params.fechaInicioISO),
-      end_datetime: conZonaHoraria(params.fechaFinISO),
+      start_datetime: normalizarFechaISO(params.fechaInicioISO),
+      end_datetime: normalizarFechaISO(params.fechaFinISO),
       attendees: [params.emailHuesped],
       // Sin link de Google Meet: no aplica a una reserva de alojamiento.
       create_meeting_room: false,
