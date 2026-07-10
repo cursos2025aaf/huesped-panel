@@ -1,24 +1,23 @@
 // netlify/functions/lib/pagos-client.mts
 //
-// Doble riel de cobro de HuésPED: MercadoPago (huésped local, vía el MCP/API
-// oficial de Mercado Pago) y Stripe (huésped internacional, vía Composio).
-// La elección de riel la decide el Agente de Cobro según el perfil de
-// modalidad y el país/moneda del huésped.
+// Riel de cobro de HuésPED: MercadoPago Checkout Pro. Un solo proveedor
+// para huésped local e internacional — MercadoPago acepta tarjetas de
+// crédito/débito internacionales (Visa, Mastercard, Amex) y las cobra
+// convertidas a pesos, así que no hace falta un segundo proveedor para
+// cubrir al huésped extranjero.
 //
-// Variables de entorno requeridas:
+// Variable de entorno requerida:
 //   MERCADOPAGO_ACCESS_TOKEN
-//   STRIPE_SECRET_KEY
 
 export interface LinkPagoParams {
   montoARS?: number;
-  montoUSD?: number;
   descripcion: string;
   referenciaReserva: string;
   emailHuesped: string;
 }
 
 export interface LinkPagoResultado {
-  proveedor: "mercadopago" | "stripe";
+  proveedor: "mercadopago";
   url: string;
 }
 
@@ -62,57 +61,12 @@ export async function crearLinkMercadoPago(
   return { proveedor: "mercadopago", url: json.init_point };
 }
 
-export async function crearLinkStripe(
-  params: LinkPagoParams
-): Promise<LinkPagoResultado> {
-  const secretKey = Netlify.env.get("STRIPE_SECRET_KEY");
-  if (!secretKey) {
-    throw new Error("Falta configurar STRIPE_SECRET_KEY en Netlify.");
-  }
-  if (!params.montoUSD) {
-    throw new Error("crearLinkStripe requiere montoUSD.");
-  }
-
-  const body = new URLSearchParams({
-    "line_items[0][price_data][currency]": "usd",
-    "line_items[0][price_data][product_data][name]": params.descripcion,
-    "line_items[0][price_data][unit_amount]": String(Math.round(params.montoUSD * 100)),
-    "line_items[0][quantity]": "1",
-    mode: "payment",
-    "customer_email": params.emailHuesped,
-    client_reference_id: params.referenciaReserva,
-    success_url: "https://huesped.iagentes.tech/pago-confirmado",
-    cancel_url: "https://huesped.iagentes.tech/pago-cancelado",
-  });
-
-  const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: `Bearer ${secretKey}`,
-    },
-    body,
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Stripe respondió ${res.status}: ${text}`);
-  }
-
-  const json = (await res.json()) as { url: string };
-  return { proveedor: "stripe", url: json.url };
-}
-
-// Decide el riel de cobro según el perfil de modalidad y el origen del
-// huésped. Regla simple y explícita: huésped con email/teléfono de
-// Argentina o que pide precio en pesos -> MercadoPago; caso contrario,
-// y solo si la modalidad lo permite, Stripe.
+// Punto único de entrada para generar el link de cobro. Se mantiene esta
+// función (en lugar de llamar a crearLinkMercadoPago directamente desde el
+// Agente de Cobro) para que, si en el futuro se suma otro medio de pago,
+// el cambio quede aislado acá y no en el agente.
 export async function generarLinkDePago(
-  esHuespedInternacional: boolean,
   params: LinkPagoParams
 ): Promise<LinkPagoResultado> {
-  if (esHuespedInternacional && params.montoUSD) {
-    return crearLinkStripe(params);
-  }
   return crearLinkMercadoPago(params);
 }
