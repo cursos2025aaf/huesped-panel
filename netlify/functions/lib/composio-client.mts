@@ -107,12 +107,18 @@ export interface EventoCalendar {
   htmlLink?: string;
   unidad?: string;
   emailHuesped?: string;
+  // Estado real de cobro, si ya se etiquetó vía webhook-mercadopago.mts
+  // (ver actualizarPagoEnEvento). Ausente = todavía no hay pago registrado.
+  pagoEstado?: string;
+  pagoMontoARS?: number;
+  pagoFecha?: string;
 }
 
 function mapearEvento(raw: RawGoogleCalendarEvent): EventoCalendar {
   // El huésped es el attendee que no es ni organizador ni "self" (esa
   // combinación identifica a la cuenta dueña del Calendar, no al huésped).
   const attendeeHuesped = (raw.attendees ?? []).find((a) => !a.organizer && !a.self);
+  const privadas = raw.extendedProperties?.private ?? {};
   return {
     id: raw.id ?? "",
     start: raw.start?.dateTime ?? raw.start?.date ?? "",
@@ -120,8 +126,11 @@ function mapearEvento(raw: RawGoogleCalendarEvent): EventoCalendar {
     summary: raw.summary ?? "",
     descripcion: raw.description,
     htmlLink: raw.htmlLink,
-    unidad: raw.extendedProperties?.private?.unidad,
+    unidad: privadas.unidad,
     emailHuesped: attendeeHuesped?.email ?? raw.attendees?.[0]?.email,
+    pagoEstado: privadas.pagoEstado,
+    pagoMontoARS: privadas.pagoMontoARS ? Number(privadas.pagoMontoARS) : undefined,
+    pagoFecha: privadas.pagoFecha,
   };
 }
 
@@ -217,6 +226,58 @@ export async function enviarEmail(params: EnviarEmailParams): Promise<void> {
     subject: params.asunto,
     body: params.cuerpoHtml,
     is_html: true,
+  });
+}
+
+export interface EventoCalendarConPrivadas extends EventoCalendar {
+  privadas: Record<string, string>;
+}
+
+// Trae un evento puntual (por id) incluyendo sus extendedProperties.private
+// completas, para poder fusionarlas antes de actualizarlas (ver
+// actualizarPagoEnEvento) sin pisar datos ya guardados como "unidad".
+export async function obtenerEventoPorId(
+  calendarId: string,
+  eventId: string
+): Promise<EventoCalendarConPrivadas> {
+  const data = await executeAction<RawGoogleCalendarEvent>("GOOGLECALENDAR_EVENTS_GET", {
+    calendar_id: calendarId,
+    event_id: eventId,
+  });
+  return {
+    ...mapearEvento(data),
+    privadas: data.extendedProperties?.private ?? {},
+  };
+}
+
+export interface ActualizarPagoParams {
+  calendarId: string;
+  eventId: string;
+  pagoEstado: string; // "approved" | "pending" | "rejected" | "in_process" | etc. (tal cual lo devuelve MercadoPago)
+  pagoMontoARS: number;
+  pagoId: string;
+  pagoFechaISO: string;
+}
+
+// Etiqueta un evento de Calendar ya existente con el resultado real de un
+// pago (nunca inventado: siempre viene de haber consultado la API de
+// MercadoPago con el access token real, ver webhook-mercadopago.mts). Fusiona
+// con las extendedProperties.private que ya tenía el evento (ej. "unidad")
+// en vez de reemplazarlas, porque Google Calendar reemplaza el mapa entero
+// si se lo sobreescribe sin los valores previos.
+export async function actualizarPagoEnEvento(params: ActualizarPagoParams): Promise<void> {
+  const eventoActual = await obtenerEventoPorId(params.calendarId, params.eventId);
+  const privadasFusionadas = {
+    ...eventoActual.privadas,
+    pagoEstado: params.pagoEstado,
+    pagoMontoARS: String(params.pagoMontoARS),
+    pagoId: params.pagoId,
+    pagoFecha: params.pagoFechaISO,
+  };
+  await executeAction("GOOGLECALENDAR_PATCH_EVENT", {
+    calendar_id: params.calendarId,
+    event_id: params.eventId,
+    extended_properties: { private: privadasFusionadas },
   });
 }
 
