@@ -3,7 +3,9 @@
 // AGENTE B — Cobro.
 // Se dispara cuando el Agente de Atención confirma una reserva. Genera el
 // link de pago por MercadoPago (único riel — acepta tarjetas locales e
-// internacionales) según el perfil de modalidad, y lo envía por email.
+// internacionales) según la política de cobro que eligió el negocio
+// (seña + saldo, con el % que quiera, o 100% anticipado — ver
+// lib/negocios.mts: getConfiguracionCobro), y lo envía por email.
 // Diseñado como Netlify Function estándar (no background) porque el
 // trabajo es corto: un llamado a la pasarela de pago + un email.
 //
@@ -22,7 +24,7 @@
 // }
 
 import type { Context, Config } from "@netlify/functions";
-import { getPerfil } from "./lib/perfiles.mts";
+import { getConfiguracionCobro } from "./lib/negocios.mts";
 import { generarLinkDePago } from "./lib/pagos-client.mts";
 import { enviarEmail } from "./lib/composio-client.mts";
 
@@ -70,18 +72,19 @@ export default async (req: Request, _context: Context): Promise<Response> => {
   }
 
   try {
-    const perfil = getPerfil(modalidad as any);
+    // La política de cobro es del negocio, no del rubro: cada negocio elige
+    // si cobra seña + saldo o el 100% anticipado (ver getConfiguracionCobro).
+    // La modalidad solo aporta un default razonable si el negocio no eligió nada.
+    const configCobro = getConfiguracionCobro(negocioId);
 
-    // El monto a cobrar depende de la lógica de cobro del perfil: total
-    // anticipado (hostería) o seña sobre el total (resto de modalidades).
     const factorCobro =
-      perfil.cobro.timing === "anticipado_total" ? 1 : perfil.cobro.porcentajeSenal / 100;
+      configCobro.timing === "anticipado_total" ? 1 : configCobro.porcentajeSenal / 100;
 
     const montoARS = Math.round(montoTotalARS * factorCobro);
 
     const link = await generarLinkDePago({
       montoARS,
-      descripcion: `${descripcionReserva} (${perfil.cobro.timing === "anticipado_total" ? "pago total" : `seña ${perfil.cobro.porcentajeSenal}%`})`,
+      descripcion: `${descripcionReserva} (${configCobro.timing === "anticipado_total" ? "pago total" : `seña ${configCobro.porcentajeSenal}%`})`,
       referenciaReserva: reservaId,
       emailHuesped,
     });
@@ -90,7 +93,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       <p>Hola,</p>
       <p>Tu reserva (<strong>${descripcionReserva}</strong>) está confirmada.</p>
       <p>Para asegurarla, completá el pago${
-        perfil.cobro.timing === "anticipado_total" ? "" : ` de la seña (${perfil.cobro.porcentajeSenal}%)`
+        configCobro.timing === "anticipado_total" ? "" : ` de la seña (${configCobro.porcentajeSenal}%)`
       } en el siguiente link:</p>
       <p><a href="${link.url}">${link.url}</a></p>
       <p>Cualquier consulta, respondé este mismo email.</p>
