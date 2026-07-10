@@ -108,6 +108,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
         proveedor: link.proveedor,
         montoCobrado: montoARS,
         reservaId,
+        linkPago: link.url,
       }),
       { status: 200, headers: { "Content-Type": "application/json" } }
     );
