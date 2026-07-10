@@ -10,7 +10,7 @@ export type Modalidad = "balneario" | "camping" | "cabanas" | "hosteria";
 
 export type TimingCobro = "anticipado_total" | "senal_mas_saldo" | "en_el_lugar";
 export type Granularidad = "dia" | "noche" | "franja_horaria";
-export type MedioPago = "mercadopago" | "stripe" | "efectivo";
+export type MedioPago = "mercadopago" | "efectivo";
 
 export interface PerfilModalidad {
   modalidad: Modalidad;
@@ -57,7 +57,7 @@ export const PERFILES: Record<Modalidad, PerfilModalidad> = {
     cobro: {
       timing: "senal_mas_saldo",
       porcentajeSenal: 30,
-      medios: ["mercadopago", "stripe"],
+      medios: ["mercadopago"],
     },
     catalogoUpsell: ["leña", "alquiler de carpa", "kayak", "pileta"],
     canalPreferido: ["whatsapp", "email"],
@@ -73,7 +73,7 @@ export const PERFILES: Record<Modalidad, PerfilModalidad> = {
     cobro: {
       timing: "senal_mas_saldo",
       porcentajeSenal: 40,
-      medios: ["mercadopago", "stripe"],
+      medios: ["mercadopago"],
     },
     catalogoUpsell: ["desayuno", "cochera", "kit de pesca", "kit de mate"],
     canalPreferido: ["whatsapp", "email"],
@@ -89,7 +89,7 @@ export const PERFILES: Record<Modalidad, PerfilModalidad> = {
     cobro: {
       timing: "anticipado_total",
       porcentajeSenal: 100,
-      medios: ["mercadopago", "stripe"],
+      medios: ["mercadopago"],
     },
     catalogoUpsell: ["media pensión", "traslado al aeropuerto", "excursión"],
     canalPreferido: ["email", "web"],
