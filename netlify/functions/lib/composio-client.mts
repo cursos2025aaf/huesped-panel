@@ -8,6 +8,7 @@
 // Usa la API REST v3 de Composio (la v2 fue dada de baja — devuelve 410).
 // Documentación: https://docs.composio.dev/api-reference
 
+import { envGet } from "./env-shim.mts";
 const COMPOSIO_BASE_URL = "https://backend.composio.dev/api/v3";
 
 interface ComposioExecuteResponse<T = unknown> {
@@ -20,8 +21,8 @@ async function executeAction<T = unknown>(
   actionSlug: string,
   args: Record<string, unknown>
 ): Promise<T> {
-  const apiKey = Netlify.env.get("COMPOSIO_API_KEY");
-  const entityId = Netlify.env.get("COMPOSIO_ENTITY_ID") ?? "default";
+  const apiKey = envGet("COMPOSIO_API_KEY");
+  const entityId = envGet("COMPOSIO_ENTITY_ID") ?? "default";
 
   if (!apiKey) {
     throw new Error("Falta configurar COMPOSIO_API_KEY en las variables de entorno de Netlify.");
