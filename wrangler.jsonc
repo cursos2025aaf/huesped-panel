@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "huesped-iagentes",
+  "main": "worker/index.mts",
+  "compatibility_date": "2026-07-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "vars": {
+    "COMPOSIO_ENTITY_ID": "pg-test-2f8b9f0c-93ad-4fdf-bcee-ca6a342c27b6"
+  }
+}
