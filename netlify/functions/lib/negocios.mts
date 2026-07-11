@@ -20,6 +20,21 @@ export interface ConfiguracionCobro {
   porcentajeSenal: number; // se ignora si timing es "anticipado_total"
 }
 
+// Tarifa configurable por negocio, para que el sistema pueda calcular el
+// monto a cobrar SOLO — sin esto, cada reserva necesita que alguien pase
+// el monto a mano (por eso el canal de WhatsApp, hoy, no dispara el cobro
+// automáticamente: ver webhook-whatsapp.mts). Un negocio sin tarifaARS
+// configurada sigue funcionando exactamente igual que hasta ahora
+// (requiere el monto manual) — nunca se inventa un precio.
+export interface TarifaNegocio {
+  // Precio por noche (o por la unidad de granularidad de la modalidad:
+  // noche/día/franja horaria) que se cobra por defecto, en ARS.
+  precioPorNocheARS: number;
+  // Opcional: si alguna unidad puntual tiene un precio distinto al default
+  // (ej. una cabaña más grande), se define acá por nombre de unidad.
+  porUnidadARS?: Record<string, number>;
+}
+
 export interface NegocioConfig {
   nombre: string;
   modalidad: Modalidad;
@@ -29,6 +44,8 @@ export interface NegocioConfig {
   // Opcional: si el negocio quiere una política de cobro distinta a la
   // default de su modalidad. Ver ConfiguracionCobro arriba.
   configuracionCobro?: ConfiguracionCobro;
+  // Opcional: tarifa para que el cobro se calcule solo. Ver TarifaNegocio.
+  tarifa?: TarifaNegocio;
 }
 
 export const NEGOCIOS: Record<string, NegocioConfig> = {
@@ -37,6 +54,8 @@ export const NEGOCIOS: Record<string, NegocioConfig> = {
     modalidad: "cabanas",
     unidadesFisicas: Array.from({ length: 12 }, (_, i) => `Cabaña ${i + 1}`),
     // Sin configuracionCobro: usa el default de "cabanas" (seña 40% + saldo).
+    // Sin tarifa: todavía no cargó un precio real, así que el cobro sigue
+    // pidiendo el monto a mano (ver agente-cobro.mts) hasta que lo cargue.
   },
 };
 
@@ -66,4 +85,31 @@ export function getConfiguracionCobro(negocioId: string): ConfiguracionCobro {
     timing: perfil.cobro.timing,
     porcentajeSenal: perfil.cobro.porcentajeSenal,
   };
+}
+
+// Precio por noche (u otra unidad de granularidad) de una unidad puntual
+// de un negocio. Devuelve null si el negocio no configuró tarifa — nunca
+// se inventa un número.
+export function getTarifaPorNoche(negocioId: string, unidad?: string): number | null {
+  const negocio = getNegocio(negocioId);
+  const tarifa = negocio.tarifa;
+  if (!tarifa) return null;
+  if (unidad && tarifa.porUnidadARS?.[unidad] != null) {
+    return tarifa.porUnidadARS[unidad];
+  }
+  return tarifa.precioPorNocheARS;
+}
+
+// Calcula el monto TOTAL de una reserva a partir de la tarifa configurada
+// (precio por noche × cantidad de noches). Devuelve null si el negocio no
+// tiene tarifa cargada — el llamador debe pedir el monto manualmente en
+// ese caso, nunca inventar un precio.
+export function calcularMontoTotalARS(
+  negocioId: string,
+  unidad: string,
+  noches: number
+): number | null {
+  const precio = getTarifaPorNoche(negocioId, unidad);
+  if (precio == null || noches <= 0) return null;
+  return Math.round(precio * noches);
 }
