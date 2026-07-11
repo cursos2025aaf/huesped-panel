@@ -23,6 +23,7 @@ import type { Context, Config } from "@netlify/functions";
 import { getPerfil } from "./lib/perfiles.mts";
 import { buscarUnidadLibre, crearReservaEnCalendar } from "./lib/composio-client.mts";
 import { getUnidadesFisicas } from "./lib/negocios.mts";
+import { envGet } from "./lib/env-shim.mts";
 
 interface SolicitudAtencion {
   negocioId: string;
@@ -44,7 +45,7 @@ async function interpretarConsulta(
   perfilNombreUnidad: string,
   catalogoUpsell: string[]
 ): Promise<InterpretacionClaude> {
-  const apiKey = Netlify.env.get("ANTHROPIC_API_KEY");
+  const apiKey = envGet("ANTHROPIC_API_KEY");
   if (!apiKey) {
     throw new Error("Falta configurar ANTHROPIC_API_KEY en Netlify.");
   }
