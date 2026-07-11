@@ -16,12 +16,12 @@
 //        Verify token: el mismo valor de WHATSAPP_VERIFY_TOKEN
 //      y suscribirse al campo "messages".
 //
-// LÍMITE ACTUAL, a propósito documentado (no inventar que esto ya cobra solo):
-// HuésPED todavía no tiene una tabla de precios/tarifas por unidad, así que
-// este webhook NO dispara automáticamente al Agente de Cobro (no hay forma
-// honesta de calcular el monto a cobrar sin inventar un precio). Confirma la
-// reserva y la unidad asignada, y avisa que el link de pago lo manda el
-// equipo — hasta que exista una tarifa configurada por negocio.
+// COBRO AUTOMÁTICO (condicionado a que el negocio tenga tarifa cargada):
+// si el negocio configuró una tarifa en lib/negocios.mts (precioPorNocheARS),
+// este webhook llama automáticamente al Agente de Cobro y manda el link de
+// pago por WhatsApp en el mismo mensaje de confirmación. Si el negocio NO
+// tiene tarifa cargada, no hay forma honesta de calcular un monto — se avisa
+// que el equipo manda el link a mano, en vez de inventar un precio.
 //
 // Negocio fijo por ahora: solo hay un negocio real cargado (los-alerces).
 // Cuando haya más negocios habrá que enrutar por WHATSAPP_PHONE_NUMBER_ID
@@ -30,6 +30,7 @@
 import type { Context, Config } from "@netlify/functions";
 import { enviarWhatsApp } from "./lib/composio-client.mts";
 import { envGet } from "./lib/env-shim.mts";
+import { getTarifaPorNoche, calcularMontoTotalARS } from "./lib/negocios.mts";
 
 const NEGOCIO_ID = "los-alerces";
 const MODALIDAD = "cabanas";
@@ -127,11 +128,44 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       textoRespuesta = `${resultado.mensaje} ¿Querés que te propongamos otras fechas?`;
     } else {
       const interp = resultado.interpretacion;
-      textoRespuesta =
+      const base =
         `¡Listo! Reservamos ${resultado.unidadAsignada} del ${interp.fechaInicioISO.slice(0, 10)} ` +
         `al ${interp.fechaFinISO.slice(0, 10)} para ${interp.cantidadPersonas} persona(s).` +
-        (resultado.upsellSugerido ? ` Te sumamos también: ${resultado.upsellSugerido}.` : "") +
-        ` En breve te enviamos el link de pago de la seña para confirmarla.`;
+        (resultado.upsellSugerido ? ` Te sumamos también: ${resultado.upsellSugerido}.` : "");
+
+      const tarifaCargada = getTarifaPorNoche(NEGOCIO_ID, resultado.unidadAsignada) != null;
+      if (tarifaCargada) {
+        const noches = Math.max(
+          1,
+          Math.round((new Date(interp.fechaFinISO).getTime() - new Date(interp.fechaInicioISO).getTime()) / 86400000)
+        );
+        const montoTotalARS = calcularMontoTotalARS(NEGOCIO_ID, resultado.unidadAsignada, noches);
+        try {
+          const respuestaCobro = await fetch(`${url.origin}/api/cobro`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              negocioId: NEGOCIO_ID,
+              modalidad: MODALIDAD,
+              reservaId: resultado.reservaId,
+              emailHuesped: emailPlaceholder,
+              montoTotalARS,
+              descripcionReserva: `${noches} noche(s), ${resultado.unidadAsignada}`,
+            }),
+          });
+          const cobro = await respuestaCobro.json();
+          textoRespuesta = respuestaCobro.ok && cobro.linkPago
+            ? `${base} Para confirmarla, completá el pago acá: ${cobro.linkPago}`
+            : `${base} En breve te enviamos el link de pago para confirmarla.`;
+        } catch (errCobro) {
+          console.error("Error generando cobro automático desde WhatsApp:", errCobro);
+          textoRespuesta = `${base} En breve te enviamos el link de pago para confirmarla.`;
+        }
+      } else {
+        // Sin tarifa cargada para este negocio: no se inventa un monto, el
+        // equipo manda el link de pago a mano.
+        textoRespuesta = `${base} En breve te enviamos el link de pago de la seña para confirmarla.`;
+      }
     }
 
     await enviarWhatsApp({ phoneNumberId, paraNumero: numeroHuesped, texto: textoRespuesta });
