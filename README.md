@@ -1,5 +1,7 @@
 # HuésPED — Sistema Multiagente de Reservas
 
+> Por qué el nombre: "HuésPED" juega con "huésped" + "PED" de **pedido** — una reserva es, en el fondo, el pedido del huésped. (Definido 09/07/2026.)
+
 Producto IAGENTES.TECH para el rubro Hotelería y Turismo. Motor único (Agente
 de Atención + Agente de Cobro + panel) con perfiles de modalidad seleccionables:
 balneario, camping, cabañas, hostería.
