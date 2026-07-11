@@ -32,6 +32,7 @@ import type { Context, Config } from "@netlify/functions";
 import crypto from "node:crypto";
 import { consultarPago } from "./lib/pagos-client.mts";
 import { actualizarPagoEnEvento } from "./lib/composio-client.mts";
+import { envGet } from "./lib/env-shim.mts";
 
 // Valida que la notificación realmente venga de MercadoPago (y no de un
 // tercero simulando un webhook), usando el esquema oficial de firma HMAC:
@@ -40,7 +41,7 @@ import { actualizarPagoEnEvento } from "./lib/composio-client.mts";
 // la notificación (con una advertencia) para no romper mientras se termina
 // de configurar; una vez cargada la clave, se exige que la firma sea válida.
 function validarFirma(req: Request, url: URL): boolean {
-  const secret = Netlify.env.get("MERCADOPAGO_WEBHOOK_SECRET");
+  const secret = envGet("MERCADOPAGO_WEBHOOK_SECRET");
   if (!secret) {
     console.warn("MERCADOPAGO_WEBHOOK_SECRET no configurado: no se valida la firma del webhook.");
     return true;
