@@ -9,6 +9,7 @@
 // Variable de entorno requerida:
 //   MERCADOPAGO_ACCESS_TOKEN
 
+import { envGet } from "./env-shim.mts";
 export interface LinkPagoParams {
   montoARS?: number;
   descripcion: string;
@@ -24,7 +25,7 @@ export interface LinkPagoResultado {
 export async function crearLinkMercadoPago(
   params: LinkPagoParams
 ): Promise<LinkPagoResultado> {
-  const accessToken = Netlify.env.get("MERCADOPAGO_ACCESS_TOKEN");
+  const accessToken = envGet("MERCADOPAGO_ACCESS_TOKEN");
   if (!accessToken) {
     throw new Error("Falta configurar MERCADOPAGO_ACCESS_TOKEN en Netlify.");
   }
@@ -86,7 +87,7 @@ export interface PagoMercadoPago {
 // "pasó algo con el pago X", y este llamado trae el estado verdadero con
 // el access token real de la cuenta). Usado por webhook-mercadopago.mts.
 export async function consultarPago(paymentId: string): Promise<PagoMercadoPago> {
-  const accessToken = Netlify.env.get("MERCADOPAGO_ACCESS_TOKEN");
+  const accessToken = envGet("MERCADOPAGO_ACCESS_TOKEN");
   if (!accessToken) {
     throw new Error("Falta configurar MERCADOPAGO_ACCESS_TOKEN en Netlify.");
   }
