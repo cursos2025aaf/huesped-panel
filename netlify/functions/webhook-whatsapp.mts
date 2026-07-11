@@ -29,6 +29,7 @@
 
 import type { Context, Config } from "@netlify/functions";
 import { enviarWhatsApp } from "./lib/composio-client.mts";
+import { envGet } from "./lib/env-shim.mts";
 
 const NEGOCIO_ID = "los-alerces";
 const MODALIDAD = "cabanas";
@@ -61,7 +62,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     const modo = url.searchParams.get("hub.mode");
     const token = url.searchParams.get("hub.verify_token");
     const challenge = url.searchParams.get("hub.challenge");
-    const verifyToken = Netlify.env.get("WHATSAPP_VERIFY_TOKEN");
+    const verifyToken = envGet("WHATSAPP_VERIFY_TOKEN");
 
     if (!verifyToken) {
       return new Response("Falta configurar WHATSAPP_VERIFY_TOKEN en Netlify.", { status: 500 });
@@ -93,7 +94,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
   }
 
   const numeroHuesped = mensaje.from;
-  const phoneNumberId = Netlify.env.get("WHATSAPP_PHONE_NUMBER_ID");
+  const phoneNumberId = envGet("WHATSAPP_PHONE_NUMBER_ID");
 
   if (!phoneNumberId) {
     console.error("Falta configurar WHATSAPP_PHONE_NUMBER_ID en Netlify.");
