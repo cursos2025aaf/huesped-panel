@@ -98,6 +98,27 @@ del panel lee esas etiquetas — no inventa ni estima montos: una reserva sin
 pago registrado simplemente figura como "Sin registrar" hasta que se
 confirme un pago real vía este webhook.
 
+## Migración a Cloudflare Workers (en curso)
+
+Ya está deployado y funcionando en paralelo a Netlify:
+`https://huesped-iagentes.iagentestech.workers.dev`
+
+Cómo se hizo: se agregó `netlify/functions/lib/env-shim.mts` (función `envGet`
+que funciona tanto con `Netlify.env.get` como con los bindings de Cloudflare)
+y `worker/index.mts` (entrypoint que enruta /api/* a las MISMAS funciones ya
+construidas, sin reescribir su lógica). El sitio estático se sirve desde
+`public/index.html` vía el binding `ASSETS`. Config en `wrangler.jsonc`.
+
+Secrets ya cargados en Cloudflare: `MERCADOPAGO_ACCESS_TOKEN`,
+`MERCADOPAGO_WEBHOOK_SECRET`. Faltan (Andrés los tiene, no están en texto
+plano en ningún lado accesible para esta migración): `ANTHROPIC_API_KEY`,
+`COMPOSIO_API_KEY`. Sin esos dos, `/api/atencion`, `/api/panel-datos` y
+`/api/panel-secciones` responden con el mismo error claro que ya tenían
+diseñado ("Falta configurar X"), no rompen en silencio.
+
+Netlify sigue activo y funcionando sin cambios — el corte final (dejar de
+usar Netlify) se hace recién cuando Cloudflare esté 100% verificado.
+
 ## Nota técnica importante (Composio)
 
 Las llamadas a la API REST v3 de Composio (`executeAction` en
