@@ -13,18 +13,19 @@
 //   COMPOSIO_API_KEY, COMPOSIO_ENTITY_ID
 //   MERCADOPAGO_ACCESS_TOKEN
 //
-// Body esperado (POST):
+// Body esperado (POST) — dos formas de indicar el monto:
 // {
 //   "negocioId": "los-alerces",
 //   "modalidad": "cabanas",
 //   "reservaId": "abc123",
 //   "emailHuesped": "huesped@example.com",
-//   "montoTotalARS": 120000,
+//   "montoTotalARS": 120000,              // opción A: monto manual directo
+//   "unidad": "Cabaña 1", "noches": 2,    // opción B: se calcula solo si el negocio tiene tarifa cargada (ver lib/negocios.mts)
 //   "descripcionReserva": "2 noches, Cabaña Vista Lago"
 // }
 
 import type { Context, Config } from "@netlify/functions";
-import { getConfiguracionCobro } from "./lib/negocios.mts";
+import { getConfiguracionCobro, calcularMontoTotalARS } from "./lib/negocios.mts";
 import { generarLinkDePago } from "./lib/pagos-client.mts";
 import { enviarEmail } from "./lib/composio-client.mts";
 
@@ -33,7 +34,11 @@ interface SolicitudCobro {
   modalidad: string;
   reservaId: string;
   emailHuesped: string;
-  montoTotalARS: number;
+  // Opcional: si no se manda, se intenta calcular solo a partir de la
+  // tarifa configurada del negocio (unidad + noches). Ver lib/negocios.mts.
+  montoTotalARS?: number;
+  unidad?: string;
+  noches?: number;
   descripcionReserva: string;
 }
 
@@ -57,18 +62,38 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     modalidad,
     reservaId,
     emailHuesped,
-    montoTotalARS,
     descripcionReserva,
+    unidad,
+    noches,
   } = solicitud;
+  let { montoTotalARS } = solicitud;
 
-  if (!negocioId || !modalidad || !reservaId || !emailHuesped || !montoTotalARS || !descripcionReserva) {
+  if (!negocioId || !modalidad || !reservaId || !emailHuesped || !descripcionReserva) {
     return new Response(
       JSON.stringify({
-        error:
-          "Faltan campos requeridos: negocioId, modalidad, reservaId, emailHuesped, montoTotalARS, descripcionReserva",
+        error: "Faltan campos requeridos: negocioId, modalidad, reservaId, emailHuesped, descripcionReserva",
       }),
       { status: 400, headers: { "Content-Type": "application/json" } }
     );
+  }
+
+  // Si no viene el monto directo, se intenta calcular con la tarifa que el
+  // negocio haya cargado (precio por noche × noches). Si el negocio no
+  // tiene tarifa configurada, no hay forma honesta de calcular un monto —
+  // se pide explícitamente en vez de inventar un número.
+  if (!montoTotalARS) {
+    if (unidad && noches) {
+      montoTotalARS = calcularMontoTotalARS(negocioId, unidad, noches) ?? undefined;
+    }
+    if (!montoTotalARS) {
+      return new Response(
+        JSON.stringify({
+          error:
+            "Falta montoTotalARS y no hay tarifa configurada para este negocio (o faltan unidad/noches) para calcularlo solo. Pasá montoTotalARS manualmente o cargá una tarifa en negocios.mts.",
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
   }
 
   try {
